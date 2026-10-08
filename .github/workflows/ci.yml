@@ -182,6 +182,7 @@ jobs:
           if ([int]$fields['abstract'] -gt 300) { throw "abstract over the 300-character cap: $($fields['abstract'])" }
           if ([int]$fields['body'] -lt 2000 -or [int]$fields['body'] -gt 2500) { throw "body out of 2000~2500: $($fields['body'])" }
           if ($fields['marker'] -ne 'true') { throw 'gate SUMMARY reports marker != true: the fixture must carry the <!-- BODY --> divider between abstract and body' }
+          if (-not $fields.ContainsKey('notices')) { throw 'gate SUMMARY must expose the advisory notices counter (notices=)' }
 
           Write-Host "gate ok: abstract=$($fields['abstract']) body=$($fields['body']) paragraphs=$($fields['paragraphs'])"
 

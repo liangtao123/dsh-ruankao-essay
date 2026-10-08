@@ -144,7 +144,23 @@ foreach ($t in $RequireTerms) {
 }
 if ($missing.Count -gt 0) { $problems += ('D 子题目术语未命中：' + ($missing -join '、')) }
 
-# ---- E 配比提示（只看字数，不判负）----
+# ---- E1 提示：论点段的锚点句与机制命名（只提示，不影响 PASS）----
+# 契约：正文第 1 段＝背景、第 2 段＝技术方法说明、最后一段＝结尾，中间各段为论点段。
+$anchorNaming = '机制|治理|编排|策略|体系|方法|模式'
+if ($bodyLines.Count -ge 4 -and $RequireTerms.Count -gt 0) {
+  for ($k = 2; $k -lt ($bodyLines.Count - 1); $k++) {
+    $head = $bodyLines[$k]
+    if ($head.Length -gt 40) { $head = $head.Substring(0, 40) }
+    $hitTerm = $false
+    foreach ($t in $RequireTerms) { if ($t -and $head.Contains($t)) { $hitTerm = $true; break } }
+    $hitName = ($head -match $anchorNaming)
+    if (-not $hitTerm -and -not $hitName) {
+      $notices += ("E 第 {0} 段（论点段）首句既未命中 -RequireTerms 的分类词、也没有「××机制／××治理／××编排」式命名：按规范 12.2／12.3 补锚点句与机制命名" -f ($k + 2))
+    }
+  }
+}
+
+# ---- E2 配比提示（只看字数，不判负）----
 if ($bodyLines.Count -ge 3) {
   $i = 0
   foreach ($ln in $bodyLines) {
@@ -177,8 +193,8 @@ if ($RequireTerms.Count -gt 0) { Write-Output ('D 术语: 要求 ' + $RequireTer
 $notices | ForEach-Object { Write-Output ('  · ' + $_) }
 
 # 机器可读摘要行（纯 ASCII，便于 CI 与其它工具按字段取值，不受控制台代码页影响）
-Write-Output ("SUMMARY paragraphs={0} abstract={1} body={2} body_hanzi={3} total={4} marker={5} problems={6} pass={7}" -f `
-  $paras, $abstractChars, $bodyChars, $bodyHanzi, $fullChars, ($markerSeen -eq 1 -and $markerIndex -eq 1).ToString().ToLower(), $problems.Count, ($problems.Count -eq 0).ToString().ToLower())
+Write-Output ("SUMMARY paragraphs={0} abstract={1} body={2} body_hanzi={3} total={4} marker={5} problems={6} notices={7} pass={8}" -f `
+  $paras, $abstractChars, $bodyChars, $bodyHanzi, $fullChars, ($markerSeen -eq 1 -and $markerIndex -eq 1).ToString().ToLower(), $problems.Count, $notices.Count, ($problems.Count -eq 0).ToString().ToLower())
 
 if ($problems.Count -eq 0) {
   Write-Output '结论: PASS —— 摘要与正文已分框，字数与格式满足机考口径'

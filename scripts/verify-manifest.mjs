@@ -209,6 +209,7 @@ try {
 // 5) 技能引用的公开索引必须存在
 for (const required of [
   "assets/ruankao-essay-bank/references/topic-index-lite.md",
+  "assets/ruankao-essay-bank/references/article_question.md",
   "assets/ruankao-essay-writing/references/writing-rules.md",
   "LICENSE",
   "README.md",
@@ -221,6 +222,7 @@ ok(`必备文件齐全（${statSync(join(root, "README.md")).size} 字节 README
 // 6) references/ 下只允许公开文件进入版本控制（本地资料用 .git/info/exclude 忽略）
 const PUBLIC_REFERENCES = new Set([
   "assets/ruankao-essay-bank/references/topic-index-lite.md",
+  "assets/ruankao-essay-bank/references/article_question.md",
   "assets/ruankao-essay-writing/references/writing-rules.md",
 ]);
 try {

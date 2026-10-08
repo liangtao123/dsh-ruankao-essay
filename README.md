@@ -11,6 +11,7 @@
 - **Host 插件行 id**：`ruankao-essay`
 - **提供的技能**：`ruankao-essay-writing`（写作／改写总纲）、`ruankao-essay-bank`（题库、理论骨架与评分口径）、`ruankao-essay-review`（逐部分自评与改写建议）
 - **写作口径**：2026-10 机考双框——摘要 ≤300 字（含标点）＋正文 2000~2500 字（含标点）
+- **交付形态**：源稿在摘要段之后带唯一一行分界标记 `<!-- BODY -->`；`.doc` 出两种——「分框标注版」（默认，摘要框／正文框分栏并标字数）与「无标注版」（`-Plain`，考场粘贴用），回复里摘要与正文分栏呈现
 - **Client 半**：`client.js`，在 `conversation.composer.dock` 注册「题库速查」面板
 - **形态**：Host 半纯 JS 无依赖、无构建步骤；Client 半是单文件浏览器模块
 - **版本**：0.1.0，变更见 [CHANGELOG.md](CHANGELOG.md)　·　安全策略见 [SECURITY.md](SECURITY.md)　·　贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -22,7 +23,7 @@
 | 技能 | 干什么 | 何时加载 |
 |---|---|---|
 | `ruankao-essay-bank` | 查：真题表（2016—2026，系统分析师＋系统架构设计师两表）、按题型的理论骨架、写作规格、考试常识与官方评分口径 | 拿到题目先查它 |
-| `ruankao-essay-writing` | 写：摘要／正文双框字数、部分配比、子题目回应规则、Word 交付与门禁脚本 | 动笔与交付时 |
+| `ruankao-essay-writing` | 写：摘要／正文双框字数、分框交付（分界标记＋分框标注版／无标注版两种 .doc）、部分配比、子题目回应规则、门禁脚本 | 动笔与交付时 |
 | `ruankao-essay-review` | 评：机械项检查（双框字数／禁写项／结尾模板化）＋逐部分体检＋逐条改写建议 | 交稿前自评 |
 
 三个技能配合的完整链路：**查题 → 备材料（PRD）→ 定骨架 → 配实例 → 成稿 → 门禁自检 → 生成 .doc**。
@@ -92,7 +93,7 @@ dsh-ruankao-essay/
 │  ├─ ci.yml                     # CI：Linux 校验 + Windows 端到端测试
 │  └─ github-release.yml         # 打 tag 时只创建 GitHub Release（不发 npm）
 ├─ tests/
-│  ├─ fixtures/sample-essay.md   # 公开的合规样例（摘要＋正文 6 段，须过门禁）
+│  ├─ fixtures/sample-essay.md   # 公开的合规样例（摘要段＋<!-- BODY -->＋正文 5 段，须过门禁）
 │  ├─ fixtures/quote-sample.md   # 直引号 → 中文引号 的转换样例
 │  └─ out/                       # 测试产物（已 gitignore）
 └─ assets/
@@ -100,8 +101,8 @@ dsh-ruankao-essay/
    │  ├─ SKILL.md
    │  ├─ references/writing-rules.md
    │  └─ scripts/
-   │     ├─ make-essay-doc.ps1        # Markdown → Word 可打开的 .doc（分别统计摘要／正文字数）
-   │     ├─ check-essay.ps1           # 门禁：双框字数＋格式＋部分职能＋实例密度＋术语覆盖
+   │     ├─ make-essay-doc.ps1        # Markdown → .doc：默认「分框标注版」（摘要框／正文框分栏），-Plain 出「无标注版」
+   │     ├─ check-essay.ps1           # 门禁：分框分界＋双框字数＋格式＋部分职能＋实例密度＋术语覆盖
    │     └─ ingest-essay.ps1          # 过门禁后把成稿收进本地题库（个人资料，不入库）
    ├─ ruankao-essay-review/           # 技能三：评
    │  └─ SKILL.md                     # 逐部分体检表＋五类扣分＋输出格式
@@ -119,21 +120,26 @@ dsh-ruankao-essay/
 会话里出现「写软考系分论文 / 这个论文题目怎么写 / 押题」之类需求时，Agent 会加载技能，然后：
 
 1. 在 `references/topic-index-lite.md` 里定位题目（真题题名、通用理论骨架、写作规格、考试常识与评分口径），需要**题目原文**时读 `references/article_question.md`（架构 13 个考期 52 题的题干与三个写作要求，按考期小节查）；若本地 `references/` 下另有参考资料，优先按需读取；
-2. 按机考双框口径成稿：**摘要 ≤300 字独立成部分（不写「摘要」二字）、正文 2000~2500 字（均含标点）、无标题、无「背景／子题目」字眼、无分点标号、建设期只写在摘要**；
+2. 按机考双框口径成稿：**摘要 ≤300 字独立成部分（不写「摘要」二字）、摘要段之后一行 `<!-- BODY -->` 分界标记、正文 2000~2500 字（均含标点）、无标题、无「背景／子题目」字眼、无分点标号、建设期只写在摘要**；
 3. 部分配比：项目背景 400~500／技术方法说明 400~500（回应子题目 2）／论点两段各约 500（回应子题目 3）／结尾 300~450；每个论点配一条项目业务实例，正文至少 3 段带具体数字；
 4. 结尾写量化成效与对该方法的理性认识，**不写**「不足之处／改进措施／下一步将」这套模板；
 5. 用脚本交付并过门禁（用调用运算符，不要套 `pwsh -File`——本机 shell 里没有 `pwsh` 命令）：
 
 ```powershell
+# 分框标注版（默认，摘要框／正文框分栏）
 & "<skill-directory>\scripts\make-essay-doc.ps1" -MdPath "D:\out\论敏捷开发方法（Scrum）.md"
-# 段数: 6  摘要字数: 296  正文字数: 2384  正文纯汉字: 2120
+# 形态: 分框标注版（摘要框／正文框已分栏）
+# 摘要框: 296 字（上限 300） / 正文框: 2384 字（2000~2500），共 5 段
 # 已生成: D:\out\论敏捷开发方法（Scrum）.doc
 
+# 无标注版（考场直接粘贴）
+& "<skill-directory>\scripts\make-essay-doc.ps1" -MdPath "D:\out\论敏捷开发方法（Scrum）.md" -Plain
+
 & "<skill-directory>\scripts\check-essay.ps1" -MdPath "D:\out\论敏捷开发方法（Scrum）.md" -RequireTerms '角色','工件','活动'
-# 结论: PASS —— 摘要与正文均在机考字数内，格式与部分职能满足口径
+# 结论: PASS —— 摘要与正文已分框，字数与格式满足机考口径
 ```
 
-门禁未输出 `PASS` 不得交付；脚本会剥掉 `**` 粗体标记再统计，并按「第 1 段＝摘要」分别核对 300 与 2000~2500 两个字数十限（可用 `-AbstractMax`／`-BodyMin`／`-BodyMax` 调整）。
+门禁未输出 `PASS` 不得交付；脚本会剥掉 `**` 粗体标记再统计，按「第 1 段＝摘要、分界标记之后＝正文」分别核对 300 与 2000~2500 两个字数十限（可用 `-AbstractMax`／`-BodyMin`／`-BodyMax` 调整），并要求分界标记存在且唯一（`SUMMARY` 行给 `marker=`）。
 
 ## 五、自制／扩展
 
@@ -158,10 +164,18 @@ node scripts/verify-manifest.mjs
 
 ```powershell
 & .\assets\ruankao-essay-writing\scripts\make-essay-doc.ps1 -MdPath .\tests\fixtures\sample-essay.md -OutPath .\tests\out\sample.doc
-# 段数: 6  摘要字数: 271  正文字数: 2056  正文纯汉字: 1885
+# 形态: 分框标注版（摘要框／正文框已分栏）
+# 段数: 6  分界标记: 有
+# 摘要框: 271 字（上限 300） / 正文框: 2056 字（2000~2500），共 5 段  正文纯汉字: 1885
+
+# 无标注版（考场粘贴用）
+& .\assets\ruankao-essay-writing\scripts\make-essay-doc.ps1 -MdPath .\tests\fixtures\sample-essay.md -Plain
 
 & .\assets\ruankao-essay-writing\scripts\check-essay.ps1 -MdPath .\tests\fixtures\sample-essay.md -RequireTerms 'TCC'
-# 结论: PASS
+# 结论: PASS —— 摘要与正文已分框，字数与格式满足机考口径
+
+# 本地全量回归（含分框断言与负例，等价于 CI 的 word-script 作业）
+& powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\out\ci-sim.ps1
 ```
 
 ### CI（GitHub Actions）
@@ -171,7 +185,7 @@ node scripts/verify-manifest.mjs
 | 作业 | 运行环境 | 内容 |
 |---|---|---|
 | 清单与技能资产校验 | ubuntu-latest | `node --check index.js`／`client.js`、解析 JSON、跑 `verify-manifest.mjs`（含面板与题库表一致性、年度覆盖、骨架 tag、zh／en 字典键集）、确认 `references/` 下只有公开文件被跟踪 |
-| 生成脚本与门禁端到端测试 | windows-latest | 校验两个脚本保留 UTF-8 BOM；由 fixture 推导期望段数并断言 `.doc` 段数一致；用 `quote-sample.md` 断言直引号被转成中文引号；跑门禁断言 `pass=true` 且摘要 ≤300、正文 2000~2500；另有三条负例（摘要超长／正文过短／直引号与分点标号）断言门禁返回 1 |
+| 生成脚本与门禁端到端测试 | windows-latest | 校验两个脚本保留 UTF-8 BOM；由 fixture 推导期望段数并断言 `.doc` 段数一致；**断言默认 `.doc` 分出「摘要框／正文框」两个 `<h3>` 标题、`-Plain` 无标题且段落数一致**；用 `quote-sample.md` 断言直引号被转成中文引号；跑门禁断言 `pass=true` 且 `marker=true`、摘要 ≤300、正文 2000~2500；另有四条负例（摘要超长／正文过短／直引号与分点标号／**缺 `<!-- BODY -->` 分界标记**）断言门禁返回 1 |
 
 另有 `.github/workflows/github-release.yml`：推送 `v*` tag 时先跑校验，再创建一个 GitHub Release（仅源码快照，不发布到 npm）。
 
@@ -183,7 +197,8 @@ node scripts/verify-manifest.mjs
 - 真题题名按公开站点汇总整理（核实日期 2026-10-08）：每道题名至少两个独立来源，列序多取自公开试卷页或带试题序号的来源；2025/11 标 `†`（列序未核），2023/11 起机考分批、同一考期不同批次题目可能不同。`verify-manifest.mjs` 会校验面板数据与题库表一致、架构表覆盖 2016—2026 各年度。
 - `references/article_question.md` 收录架构 13 个考期 52 道论文题的题面（论题＋题干引子＋「请围绕……」＋三个写作要求），只收题面、不含解题思路与范文。其中 2016/11、2017/11、2018/11 的题面取自官方下午试卷 II 的 PDF 原文（逐字）；2021/11 取自公开真题 PDF 转录（已剔除机构导语）；2019/11、2020/11、2022/11、2023/11、2024/11 取自公开真题整理版；2024/05—2026/05 为机考回忆版／机构公开整理，2024/11 与 2026/05 的题干引子未公开（只有三个子问题）。文字只做折行合并、题号与标点统一，个别虚词（如「及／及其」）可能与试卷印刷有出入。
 - `make-essay-doc.ps1` 与 `check-essay.ps1` 在 Windows PowerShell 5.1 与 PowerShell 7 上均可用；脚本必须保持带 BOM 的 UTF-8，CI 与 `verify-manifest.mjs` 都会拦截丢失 BOM 的提交。
-- 门禁的硬项是摘要 ≤300 与正文 2000~2500（含标点）；部分配比只做提示。若官方口径变化，改脚本参数即可，不必改逻辑。
+- 门禁的硬项是**分框分界标记（`<!-- BODY -->` 必须存在、唯一、位于摘要段之后）**、摘要 ≤300 与正文 2000~2500（含标点）；部分配比只做提示。若官方口径变化，改脚本参数即可，不必改逻辑。
+- 交付一律分框：`.doc` 默认是「分框标注版」（摘要框／正文框分栏），`-Plain` 是「无标注版」（考场粘贴用）；回复里也应把摘要与正文分栏呈现，不要给一段连排文本。
 
 ## 七、从 GitHub 安装
 

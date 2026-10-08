@@ -1,13 +1,15 @@
-﻿# 成稿门禁自检（2026-10 机考口径）：双框字数 + 格式硬约束 + 部分职能 + 实例密度 + 术语覆盖
+﻿# 成稿门禁自检（2026-10 机考口径）：双框分界 + 双框字数 + 格式硬约束 + 部分职能 + 实例密度 + 术语覆盖
 # 用法：
 #   & .\check-essay.ps1 -MdPath 'D:\path\论xxx.md'
 #   & .\check-essay.ps1 -MdPath 'D:\path\论xxx.md' -RequireTerms '产品负责人','Scrum Master','产品待办列表'
 #   & .\check-essay.ps1 -MdPath 'D:\path\论xxx.md' -StripAbstractLabel      # 稿子带「摘要：」前缀时自动剥离
 # 退出码：0 = PASS；1 = 不达标（详见输出）；2 = 文件缺失
 #
-# 契约：源稿第 1 段＝摘要（≤300 含标点），其余段落＝正文（2000~2500 含标点）。
+# 契约：源稿第 1 段＝摘要（≤300 含标点）；摘要段之后必须有且只有一行分界标记 <!-- BODY -->；
+#       其余段落＝正文（2000~2500 含标点）。分界标记是 HTML 注释，不参与字数统计。
 # 检查项：
-#   A 格式：摘要 ≤AbstractMax、正文在 BodyMin~BodyMax、无标题、无粗体、无直引号、无禁写字眼与分点标号
+#   A 分框与格式：分界标记必须存在、唯一、单独占一行且恰好位于摘要段之后；摘要 ≤AbstractMax、
+#                 正文在 BodyMin~BodyMax；无标题、无粗体、无直引号、无禁写字眼与分点标号
 #   B 部分职能：摘要含身份（本人/笔者）与金额（万）、周期（月）；建设期（年+月）只写在摘要；
 #               结尾段含量化效果（%/成/倍）且不含「不足之处/改进措施/下一步将」这套模板
 #   C 实例密度：正文中至少 3 段含具体数字
@@ -25,6 +27,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# 兼容 powershell.exe -File 的传参方式：-RequireTerms a,b,c 会被拼成一个逗号串，这里再拆开
+if ($RequireTerms.Count -eq 1 -and $RequireTerms[0] -match '[,，]') {
+  $RequireTerms = @($RequireTerms[0] -split '[,，]' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+}
 if (-not (Test-Path $MdPath)) { Write-Output ('[缺失] ' + $MdPath); exit 2 }
 
 # 整块剥掉 HTML 注释（含多行元数据注释），避免注释里的引号/字眼被误判
@@ -36,16 +43,29 @@ if ($StripAbstractLabel) {
   $rawText = [regex]::Replace($rawText, '(?m)^\s*摘\s*要\s*[：:]\s*', '')
 }
 
-$textNoComment = [regex]::Replace($rawText, '(?s)<!--.*?-->', '')
-$rawLines = @($textNoComment -split "\r?\n")
-$lines = @($rawLines | Where-Object { $_.Trim() -ne '' })
+# ---- 分框分界标记：摘要段之后必须有且只有一行 <!-- BODY -->（也接受 <!-- 正文开始 -->）----
+# 先把标记替换成占位符再剥注释：既能定位标记在第几段之后，又不让标记进入字数统计。
+$markerToken = '@@BODY_MARKER@@'
+$markerRegex = '(?m)^[ \t]*<!--\s*(BODY|正文开始).*?-->[ \t]*\r?$'
+$markerSeen = ([regex]::Matches($rawText, $markerRegex)).Count
+$probe = [regex]::Replace($rawText, $markerRegex, $markerToken)
+$probeNoComment = [regex]::Replace($probe, '(?s)<!--.*?-->', '')
+$probeLines = @(($probeNoComment -split "\r?\n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
+
+$markerIndex = -1
+for ($i = 0; $i -lt $probeLines.Count; $i++) {
+  if ($probeLines[$i] -eq $markerToken) { $markerIndex = $i; break }
+}
+
+$rawLines = @($probeNoComment -split "\r?\n")
+$lines = @($probeLines | Where-Object { $_ -ne $markerToken })
 $paras = $lines.Count
 
 $problems = @()
 $notices = @()
 if ($paras -eq 0) { Write-Output '[缺失] 文件里没有内容段'; exit 1 }
 
-$abstract = $lines[0]
+$abstract = [string]$lines[0]
 $bodyLines = @()
 if ($paras -gt 1) { $bodyLines = @($lines[1..($paras - 1)]) }
 $body = ($bodyLines -join '')
@@ -61,7 +81,17 @@ $bodyChars = Measure-Chars $body
 $fullChars = Measure-Chars $full
 $bodyHanzi = Measure-Hanzi $body
 
-# ---- A 格式 ----
+# ---- A 格式（先报分框分界）----
+if ($markerSeen -eq 0) {
+  $problems += 'A 缺少摘要／正文分界标记：请在摘要段之后加一行 <!-- BODY -->（分框交付要求，见写作技能）'
+} elseif ($markerSeen -gt 1) {
+  $problems += ('A 出现 {0} 个分界标记 <!-- BODY -->，只能有 1 个' -f $markerSeen)
+} elseif ($markerIndex -lt 0) {
+  $problems += 'A 分界标记必须单独占一行（形如 <!-- BODY -->），不能与其它文字写在同一行'
+} elseif ($markerIndex -ne 1) {
+  $problems += ('A 分界标记位置错误：标记前有 {0} 段内容，应恰好放在第 1 段（摘要）之后' -f $markerIndex)
+}
+
 if ($abstractChars -gt $AbstractMax) { $problems += ("A 摘要 $abstractChars 字，超过机考上限 $AbstractMax（含标点），必须删到 $AbstractMax 以内") }
 if ($bodyChars -lt $BodyMin -or $bodyChars -gt $BodyMax) {
   $problems += ("A 正文 $bodyChars 字，应在 $BodyMin~$BodyMax（含标点）；机考正文框超 $BodyMax 无法提交")
@@ -131,7 +161,10 @@ if ($bodyLines.Count -ge 3) {
 if ($RequireTerms.Count -eq 0) { $notices += 'E 未传 -RequireTerms：子题目 2 的分类名称没有被机械核对，建议补上' }
 
 # ---- 输出 ----
+$markerState = if ($markerSeen -eq 1 -and $markerIndex -eq 1) { '有（第 1 段之后）' } elseif ($markerSeen -gt 0) { "异常（$markerSeen 个／位置 $markerIndex）" } else { '缺失' }
 Write-Output ('文件: ' + $MdPath)
+Write-Output ("A 分框: 摘要框=1 段/{0} 字（≤{1}） 正文框={2} 段/{3} 字（{4}~{5}） 分界标记={6}" -f `
+  $abstractChars, $AbstractMax, $bodyLines.Count, $bodyChars, $BodyMin, $BodyMax, $markerState)
 Write-Output ("A 格式: 段数={0} 摘要={1} 正文={2} 正文汉字={3} 合计={4} 标题={5} 粗体={6} 直引号={7} 禁写={8}" -f `
   $paras, $abstractChars, $bodyChars, $bodyHanzi, $fullChars, $titles, $bold, $straight, $banned)
 Write-Output ("B 职能: 摘要身份/金额/周期={0} 建设期越界={1} 结尾量化={2} 结尾模板化={3}" -f `
@@ -144,11 +177,11 @@ if ($RequireTerms.Count -gt 0) { Write-Output ('D 术语: 要求 ' + $RequireTer
 $notices | ForEach-Object { Write-Output ('  · ' + $_) }
 
 # 机器可读摘要行（纯 ASCII，便于 CI 与其它工具按字段取值，不受控制台代码页影响）
-Write-Output ("SUMMARY paragraphs={0} abstract={1} body={2} body_hanzi={3} total={4} problems={5} pass={6}" -f `
-  $paras, $abstractChars, $bodyChars, $bodyHanzi, $fullChars, $problems.Count, ($problems.Count -eq 0).ToString().ToLower())
+Write-Output ("SUMMARY paragraphs={0} abstract={1} body={2} body_hanzi={3} total={4} marker={5} problems={6} pass={7}" -f `
+  $paras, $abstractChars, $bodyChars, $bodyHanzi, $fullChars, ($markerSeen -eq 1 -and $markerIndex -eq 1).ToString().ToLower(), $problems.Count, ($problems.Count -eq 0).ToString().ToLower())
 
 if ($problems.Count -eq 0) {
-  Write-Output '结论: PASS —— 摘要与正文均在机考字数内，格式与部分职能满足口径'
+  Write-Output '结论: PASS —— 摘要与正文已分框，字数与格式满足机考口径'
   exit 0
 }
 Write-Output '结论: 不达标，需修改：'

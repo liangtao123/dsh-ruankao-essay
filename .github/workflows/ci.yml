@@ -113,6 +113,34 @@ jobs:
           if ($straight -ne 0) { throw 'body still contains straight quotes' }
           if ($chinese -lt 2) { throw 'straight quotes in the fixture were not converted' }
 
+      - name: Assert the .doc splits abstract and body into two boxes
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $script = Join-Path $root 'assets/ruankao-essay-writing/scripts/make-essay-doc.ps1'
+          $fixture = Join-Path $root 'tests/fixtures/sample-essay.md'
+          $labeled = Join-Path $root 'tests/out/labeled.doc'
+          $plain = Join-Path $root 'tests/out/plain.doc'
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath $fixture -OutPath $labeled | ForEach-Object { Write-Host $_ }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath $fixture -OutPath $plain -Plain | ForEach-Object { Write-Host $_ }
+
+          if (-not (Test-Path $labeled)) { throw 'labeled.doc was not produced' }
+          if (-not (Test-Path $plain)) { throw 'plain.doc was not produced' }
+
+          $lab = Get-Content -LiteralPath $labeled -Raw
+          $pln = Get-Content -LiteralPath $plain -Raw
+          $labBoxes = [regex]::Matches($lab, '<h3').Count
+          $plnBoxes = [regex]::Matches($pln, '<h3').Count
+          if ($labBoxes -ne 2) { throw "the default .doc must carry two box headings (abstract/body), got $labBoxes" }
+          if ($plnBoxes -ne 0) { throw "the -Plain .doc must carry no box headings, got $plnBoxes" }
+
+          $labParas = [regex]::Matches($lab, '<p>').Count
+          $plnParas = [regex]::Matches($pln, '<p>').Count
+          if ($labParas -ne $plnParas) { throw "labeled and plain paragraph counts differ: $labParas vs $plnParas" }
+
+          Write-Host "box separation ok: labeled boxes=$labBoxes paragraphs=$labParas; plain paragraphs=$plnParas"
+
       - name: Run the essay gate on the fixture and assert PASS plus the word caps
         shell: pwsh
         run: |
@@ -133,6 +161,7 @@ jobs:
           if ($fields['pass'] -ne 'true') { throw 'gate SUMMARY reports pass != true' }
           if ([int]$fields['abstract'] -gt 300) { throw "abstract over the 300-character cap: $($fields['abstract'])" }
           if ([int]$fields['body'] -lt 2000 -or [int]$fields['body'] -gt 2500) { throw "body out of 2000~2500: $($fields['body'])" }
+          if ($fields['marker'] -ne 'true') { throw 'gate SUMMARY reports marker != true: the fixture must carry the <!-- BODY --> divider between abstract and body' }
 
           Write-Host "gate ok: abstract=$($fields['abstract']) body=$($fields['body']) paragraphs=$($fields['paragraphs'])"
 
@@ -190,3 +219,23 @@ jobs:
           if ($code -ne 1) { throw "expected the gate to exit 1 for a straight quote, got $code" }
 
           Write-Host 'negative test passed'
+
+      - name: Negative test - the gate must reject a source without the BODY divider
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $bad = Join-Path $env:TEMP 'gate-negative-marker.md'
+
+          $abstract = ([string]([char]0x7CFB)) * 280
+          $body = ([string]([char]0x6B63)) * 2050
+          Set-Content -LiteralPath $bad -Value @($abstract, $body) -Encoding UTF8
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $bad
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 1) { throw "expected the gate to exit 1 without the BODY divider, got $code" }
+          $summary = $output | Where-Object { $_ -like 'SUMMARY *' } | Select-Object -First 1
+          if ($summary -notmatch 'marker=false') { throw "expected SUMMARY marker=false, got: $summary" }
+
+          Write-Host 'negative test (missing BODY divider) passed'

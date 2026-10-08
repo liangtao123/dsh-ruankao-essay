@@ -40,9 +40,10 @@ $gateCode = $LASTEXITCODE
 $gateOut | ForEach-Object { Write-Output ('  ' + $_) }
 if ($gateCode -ne 0) { Write-Output '[拒绝入库] 成稿未通过门禁，请先按上面的失败项修改。'; exit 1 }
 
-# ② 统计（机考双框口径：第 1 段＝摘要，其余＝正文）
-$rawLines = Get-Content $MdPath -Encoding UTF8
-$lines = @($rawLines | Where-Object { $_.Trim() -ne '' -and $_ -notmatch '^<!--' })
+# ② 统计（机考双框口径：第 1 段＝摘要，其余＝正文；HTML 注释含分界标记一律剥掉）
+$rawText = [System.IO.File]::ReadAllText($MdPath, [System.Text.Encoding]::UTF8)
+$textNoComment = [regex]::Replace($rawText, '(?s)<!--.*?-->', '')
+$lines = @(($textNoComment -split "\r?\n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' })
 $title = [System.IO.Path]::GetFileNameWithoutExtension($MdPath)
 $paras = $lines.Count
 $abstractText = ''

@@ -37,7 +37,9 @@ function Resolve-FullPath([string]$Path) {
 if (-not (Test-Path -LiteralPath $MdPath)) { throw "找不到 Markdown 文件：$MdPath" }
 $MdPath = (Resolve-Path -LiteralPath $MdPath).Path
 if (-not $OutPath) {
-  $stem = [System.IO.Path]::ChangeExtension($MdPath, $null)
+  # 注意：Windows PowerShell 5.1 的 .NET Framework 下 ChangeExtension(path, $null) 会留下结尾的点，
+  # 拼出来是「论xxx..doc」；这里统一用 GetFileNameWithoutExtension 拼默认文件名。
+  $stem = Join-Path ([System.IO.Path]::GetDirectoryName($MdPath)) ([System.IO.Path]::GetFileNameWithoutExtension($MdPath))
   $OutPath = $stem + $(if ($Plain) { '-无标注版.doc' } else { '.doc' })
 }
 $OutPath = Resolve-FullPath $OutPath
@@ -110,7 +112,7 @@ try {
     try { [System.IO.File]::WriteAllText($target, $sb.ToString(), (New-Object System.Text.UTF8Encoding $true)); $ok = $true; break } catch { }
   }
   if (-not $ok) {
-    $target = [System.IO.Path]::ChangeExtension($OutPath, $null) + '_v2.doc'
+    $target = (Join-Path ([System.IO.Path]::GetDirectoryName($OutPath)) ([System.IO.Path]::GetFileNameWithoutExtension($OutPath))) + '_v2.doc'
     [System.IO.File]::WriteAllText($target, $sb.ToString(), (New-Object System.Text.UTF8Encoding $true))
     Write-Warning "原文件被占用，已另存：$target"
   }

@@ -156,6 +156,7 @@
 - **注释要整块剥**：只按「行首是 `<!--`」过滤会把多行注释的中间行当成正文段落（生成脚本已经修掉，改脚本时别退回去）；
 - **CRLF 稿子**：分界标记的正则行尾要写 `[ \t]*\r?$`，否则 Windows 下 `Set-Content` 写出的稿子会被误判「缺标记」；
 - **`<p>` 计数是 CI 契约**：分栏标题与说明行一律用 `<h3>`／`<div>`，且 HTML 属性用单引号，避免触发「正文无直引号」检查；
+- **默认文件名别用 `Path.ChangeExtension(path, $null)`**：Windows PowerShell 5.1（.NET Framework）会保留结尾的点，拼出来是「论xxx..doc」；用 `GetFileNameWithoutExtension` 再拼后缀（CI 与本地镜像都有断言）。
 - 被调用的 `.ps1` 里 `exit` 会结束整个 PowerShell 进程：如果一条命令里「先跑门禁、再生成 doc」，要在各自独立的进程/调用里执行。
 
 ## 十三、通用默写检查表

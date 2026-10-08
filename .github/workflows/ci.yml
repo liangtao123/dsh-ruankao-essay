@@ -141,6 +141,26 @@ jobs:
 
           Write-Host "box separation ok: labeled boxes=$labBoxes paragraphs=$labParas; plain paragraphs=$plnParas"
 
+      - name: Default output naming must not double the dot
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $script = Join-Path $root 'assets/ruankao-essay-writing/scripts/make-essay-doc.ps1'
+          $work = Join-Path $root 'tests/out/naming'
+          New-Item -ItemType Directory -Force -Path $work | Out-Null
+          Copy-Item -LiteralPath (Join-Path $root 'tests/fixtures/sample-essay.md') -Destination (Join-Path $work 'sample.md') -Force
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath (Join-Path $work 'sample.md') | ForEach-Object { Write-Host $_ }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath (Join-Path $work 'sample.md') -Plain | ForEach-Object { Write-Host $_ }
+
+          if (-not (Test-Path (Join-Path $work 'sample.doc'))) { throw 'default-named boxed doc was not produced as sample.doc' }
+          $plainNamed = @(Get-ChildItem -LiteralPath $work -Filter 'sample-*.doc')
+          if ($plainNamed.Count -lt 1) { throw 'default-named plain doc was not produced' }
+          $doubled = @(Get-ChildItem -LiteralPath $work -Filter '*..doc')
+          if ($doubled.Count -gt 0) { throw "default naming produced a doubled dot: $($doubled[0].Name)" }
+
+          Write-Host "default naming ok: $((Get-ChildItem -LiteralPath $work -Filter '*.doc').Name -join ', ')"
+
       - name: Run the essay gate on the fixture and assert PASS plus the word caps
         shell: pwsh
         run: |

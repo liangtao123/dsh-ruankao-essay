@@ -11,6 +11,7 @@
 - **生成脚本默认分框交付**：`make-essay-doc.ps1` 默认输出「分框标注版」——正文前插入 `摘要框（N 字／上限 300）` 与 `正文框（N 字／2000~2500，共 M 段）` 两个 `<h3>` 标题并附一行说明，把两框分开；新增 `-Plain` 输出「无标注版」（只有摘要段与正文段）供考场直接粘贴，默认文件名加 `-无标注版`。顺带修掉两个 bug：多行 HTML 注释被当成正文段落、CRLF 稿子认不出分界标记。
 - **入库脚本同步**：`ingest-essay.ps1` 改为先整块剥掉 HTML 注释（含多行）再统计摘要／正文字数，避免注释行混入正文统计。
 - **测试与 CI**：两个 fixture 补 `<!-- BODY -->`；CI 新增三条断言（默认 `.doc` 必须分出两个框且 `-Plain` 无框、段落数一致；无分界标记的稿子必须被门禁拒绝且 `marker=false`；fixture 的 `SUMMARY` 必须 `marker=true`）；本地镜像 `tests/out/ci-sim.ps1` 同步新增同类断言。
+- **修复默认文件名双点（后续补丁）**：Windows PowerShell 5.1 用的 .NET Framework 里 `Path.ChangeExtension(path, $null)` 会保留结尾的点，不传 `-OutPath` 时会生成「论xxx**..**doc」；改用 `GetFileNameWithoutExtension` 拼接（`_v2.doc` 兜底路径同改），并在 CI 与本地镜像加三条断言（默认名生成 `sample.doc`、`-Plain` 生成 `sample-*.doc`、目录里不得出现 `*..doc`）。
 - **技能与规范**：三个技能的 `SKILL.md` 与 `references/writing-rules.md`（真相源）新增「双框分界与交付（硬约束）」——源稿约定、两种 `.doc`、交付回复必须分栏呈现；`writing-rules.md` 章节顺延为十二／十三／十四，并补记 `.ps1` 改完必须确认 BOM、`<p>` 计数契约、CRLF 正则等工程坑。
 - 起因：此前生成论文时只给一段「摘要＋正文」连排文本，使用者无法分辨两框；本次把分框做成门禁硬项与默认交付形态。
 

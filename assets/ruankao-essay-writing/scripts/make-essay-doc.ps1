@@ -86,18 +86,33 @@ $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">')
 [void]$sb.AppendLine('<head><meta http-equiv="Content-Type" content="text/html; charset=utf-8">')
 [void]$sb.AppendLine('<title>Document</title>')
-[void]$sb.AppendLine('<style>@page{size:A4;margin:2.54cm 3.17cm;} body{line-height:1.5;} p{font-family:SimSun;font-size:12.0pt;line-height:1.5;text-indent:24.0pt;margin:0;text-align:justify;} h3.box{font-family:SimSun;font-size:12.0pt;font-weight:bold;margin:14pt 0 6pt 0;text-indent:0;text-align:left;} div.note{font-family:SimSun;font-size:10.5pt;color:#555555;margin:0 0 8pt 0;text-indent:0;text-align:left;}</style></head><body>')
+[void]$sb.AppendLine('<style>@page{size:A4;margin:2.54cm 3.17cm;} body{line-height:1.5;} p{font-family:SimSun;font-size:12.0pt;line-height:1.5;text-indent:24.0pt;margin:0;text-align:justify;} h3.box{font-family:SimSun;font-size:12.0pt;font-weight:bold;margin:14pt 0 6pt 0;text-indent:0;text-align:left;} div.note{font-family:SimSun;font-size:10.5pt;color:#555555;margin:0 0 8pt 0;text-indent:0;text-align:left;} div.role{font-family:SimSun;font-size:10.5pt;font-weight:bold;color:#1F4E79;margin:10pt 0 4pt 0;text-indent:0;text-align:left;}</style></head><body>')
+
+# 逐段职能：正文第 1 段＝项目背景、第 2 段＝技术方法说明、最后一段＝结尾，中间各段为论点（契约与门禁一致）
+$cnNums = @('一', '二', '三', '四', '五', '六', '七', '八', '九')
+$roleLabels = @()
+for ($i = 0; $i -lt $bodyLines.Count; $i++) {
+  if ($i -eq 0) { $roleLabels += '项目背景（回应子题目 1）' }
+  elseif ($i -eq 1) { $roleLabels += '技术方法说明（回应子题目 2）' }
+  elseif ($i -eq ($bodyLines.Count - 1)) { $roleLabels += '结尾（成效与方法边界）' }
+  elseif (($i - 2) -lt $cnNums.Count) { $roleLabels += ('论点' + $cnNums[$i - 2] + '（回应子题目 3）') }
+  else { $roleLabels += ('论点 ' + ($i - 1) + '（回应子题目 3）') }
+}
+function Measure-SegChars([string]$text) { return ($text -replace '\s', '').Length }
 
 if (-not $Plain) {
-  [void]$sb.AppendLine('<div class=''note''>分框标注版：以下按机考两个输入框分栏，分栏标题与说明不属于答卷内容；需要考场直接粘贴时，请用 -Plain 生成的无标注版。</div>')
+  [void]$sb.AppendLine('<div class=''note''>批注版：按机考两个输入框分块，并在每一段前标注该段的职能与字数；批注行不属于答卷内容。需要考场直接粘贴时，请用 -Plain 生成的无标注版。</div>')
   [void]$sb.AppendLine(('<h3 class=''box''>摘要框（{0} 字／上限 300）</h3>' -f $abstractChars))
 }
 [void]$sb.AppendLine('<p>' + (Convert-EssayLine $abstractText) + '</p>')
 if (-not $Plain) {
   [void]$sb.AppendLine(('<h3 class=''box''>正文框（{0} 字／2000~2500，共 {1} 段）</h3>' -f $bodyChars, $bodyLines.Count))
 }
-foreach ($line in $bodyLines) {
-  [void]$sb.AppendLine('<p>' + (Convert-EssayLine $line) + '</p>')
+for ($i = 0; $i -lt $bodyLines.Count; $i++) {
+  if (-not $Plain) {
+    [void]$sb.AppendLine(("<div class='role'>第 {0} 段｜{1}｜{2} 字</div>" -f ($i + 2), $roleLabels[$i], (Measure-SegChars $bodyLines[$i])))
+  }
+  [void]$sb.AppendLine('<p>' + (Convert-EssayLine $bodyLines[$i]) + '</p>')
 }
 [void]$sb.AppendLine('</body></html>')
 
@@ -118,11 +133,18 @@ try {
   }
 }
 
-$formName = if ($Plain) { '无标注版（考场粘贴用）' } else { '分框标注版（摘要框／正文框已分栏）' }
+$formName = if ($Plain) { '无标注版（考场粘贴用）' } else { '批注版（分框 + 逐段职能与字数标注）' }
 $markerState = if ($markerCount -eq 1) { '有' } elseif ($markerCount -eq 0) { '缺失（门禁会判不达标）' } else { "重复（$markerCount 个）" }
 Write-Output ('形态: ' + $formName)
 Write-Output ("段数: {0}  分界标记: {1}" -f $lines.Count, $markerState)
 Write-Output ("摘要框: {0} 字（上限 300）" -f $abstractChars)
 Write-Output ("正文框: {0} 字（2000~2500），共 {1} 段  正文纯汉字: {2}" -f $bodyChars, $bodyLines.Count, $bodyHanzi)
+if (-not $Plain) {
+  $roleLine = @()
+  for ($i = 0; $i -lt $bodyLines.Count; $i++) {
+    $roleLine += ('第 {0} 段 {1} {2} 字' -f ($i + 2), $roleLabels[$i], (Measure-SegChars $bodyLines[$i]))
+  }
+  Write-Output ('逐段职能: ' + ($roleLine -join '｜'))
+}
 Write-Output ('机考口径: 摘要 ≤300 字 / 正文 2000~2500 字（均含标点）')
 Write-Output ("已生成: {0}" -f $target)

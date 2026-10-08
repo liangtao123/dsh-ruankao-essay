@@ -137,6 +137,12 @@ $withNum = 0
 foreach ($ln in $bodyLines) { if ($ln -match $numPattern) { $withNum++ } }
 if ($withNum -lt 3) { $problems += "C 正文仅 $withNum 段含具体数字（应≥3，实例密度不足）" }
 
+# ---- C3（硬项）：结尾段必须给出「代价／适用边界」----
+$costWords = '代价|局限性|适用边界|边界在于|并不适用|不适用|不适合|前提条件|权衡'
+if ($tail -notmatch $costWords) {
+  $problems += 'C 结尾段未见对方法代价或适用边界的说明：请写一句锚在项目内的代价句（如「〈模块〉同样有代价，〈代价是什么〉」），只写成效与通用套话不给分'
+}
+
 # ---- D 术语覆盖 ----
 $missing = @()
 foreach ($t in $RequireTerms) {
@@ -155,9 +161,43 @@ if ($bodyLines.Count -ge 4 -and $RequireTerms.Count -gt 0) {
     foreach ($t in $RequireTerms) { if ($t -and $head.Contains($t)) { $hitTerm = $true; break } }
     $hitName = ($head -match $anchorNaming)
     if (-not $hitTerm -and -not $hitName) {
-      $notices += ("E 第 {0} 段（论点段）首句既未命中 -RequireTerms 的分类词、也没有「××机制／××治理／××编排」式命名：按规范 12.2／12.3 补锚点句与机制命名" -f ($k + 2))
+      $notices += ("E1 第 {0} 段（论点段）首句既未命中 -RequireTerms 的分类词、也没有「××机制／××治理／××编排」式命名：按规范 12.2／12.3 补锚点句与机制命名" -f ($k + 2))
     }
   }
+}
+
+# ---- C1／C2／C4 提示：数字可信度、对比论证、反套话（只提示，不影响 PASS）----
+$bodyText = ($bodyLines -join '')
+$speculativeWords = '假如|如果|可能|预计|估算|大概|据类似|按经验'
+$caliberWords = '口径|统计|实测|压测|抽样|样本|评测|评估|回归|监测|日志|按日|每日|验收|测算|试算|核算|抽样'
+$compareWords = '而不是|而非|相比|对比|放弃了|放弃|只能用|最终选择|评估过|权衡|沿用'
+$clicheWords = '极大地|高度重视|得到了各方|一致好评|提供了有力支持|打下了坚实|显著提升|大幅提升|成效显著|意义重大'
+
+$integerPct = 0
+for ($k = 0; $k -lt $bodyLines.Count; $k++) {
+  $ln = $bodyLines[$k]
+  $seg = $k + 2
+  if ($ln -match $speculativeWords -and $ln -match '\d') {
+    $notices += ("C1a 第 {0} 段含推演式数字（「假如／可能／预计」＋数字）：请标口径或改成实测值" -f $seg)
+  }
+  foreach ($m in [regex]::Matches($ln, '\d{2,3}%')) {
+    $v = [int]($m.Value.TrimEnd('%'))
+    if ($v -ge 10 -and ($v % 5) -eq 0) { $integerPct++ }
+  }
+  $digits = ([regex]::Matches($ln, '\d')).Count
+  if ($digits -ge 3 -and $k -ge 2 -and $k -lt ($bodyLines.Count - 1) -and $ln -notmatch $caliberWords) {
+    $notices += ("C1c 第 {0} 段（论点段）有 {1} 处数字但无口径词：补「按〈口径〉统计／压测／抽样」之类的来源说明" -f $seg, $digits)
+  }
+}
+if ($integerPct -gt 2) {
+  $notices += ("C1b 全文整数百分比 {0} 处（如 20%／30%／15%）：超过 2 处易被疑为编造，建议给口径或改成实测的具体值" -f $integerPct)
+}
+if ($bodyText -notmatch $compareWords) {
+  $notices += 'C2 正文未见方案对比或取舍（如「评估过 A，因〈原因〉放弃，最终选择 B」）：补一处对比能提升应用深度'
+}
+$clicheHits = ([regex]::Matches($bodyText, $clicheWords)).Count
+if ($clicheHits -gt 2) {
+  $notices += ("C4 正文套话 {0} 处（如「显著提升／高度重视／一致好评」）：建议替换为具体事实与数字" -f $clicheHits)
 }
 
 # ---- E2 配比提示（只看字数，不判负）----
@@ -170,11 +210,11 @@ if ($bodyLines.Count -ge 3) {
     elseif ($i -eq 1) { $label = '技术方法说明（建议 400~500，回应子题目 2）' }
     elseif ($i -eq $bodyLines.Count - 1) { $label = '结尾（建议 300~450）' }
     else { $label = '论点（建议每段约 500，两段为佳）' }
-    $notices += ("E 第 {0} 段（{1}）{2} 字" -f ($i + 2), $label, $c)
+    $notices += ("E2 第 {0} 段（{1}）{2} 字" -f ($i + 2), $label, $c)
     $i++
   }
 }
-if ($RequireTerms.Count -eq 0) { $notices += 'E 未传 -RequireTerms：子题目 2 的分类名称没有被机械核对，建议补上' }
+if ($RequireTerms.Count -eq 0) { $notices += 'E1 未传 -RequireTerms：子题目 2 的分类名称与论点段锚点没有被机械核对，建议补上' }
 
 # ---- 输出 ----
 $markerState = if ($markerSeen -eq 1 -and $markerIndex -eq 1) { '有（第 1 段之后）' } elseif ($markerSeen -gt 0) { "异常（$markerSeen 个／位置 $markerIndex）" } else { '缺失' }
@@ -190,6 +230,11 @@ Write-Output ("B 职能: 摘要身份/金额/周期={0} 建设期越界={1} 结�
   ($tail -match '不足之处|改进措施|下一步将|后续将改进|后续将|有待改进'))
 Write-Output ("C 实例: 正文含数字段=$withNum / $($bodyLines.Count)")
 if ($RequireTerms.Count -gt 0) { Write-Output ('D 术语: 要求 ' + $RequireTerms.Count + ' 项，未命中 ' + $missing.Count + ' 项') }
+$noticeStruct = @($notices | Where-Object { $_ -match '^E1' }).Count
+$noticeRatio = @($notices | Where-Object { $_ -match '^E2' }).Count
+$noticeData = @($notices | Where-Object { $_ -match '^C1' }).Count
+$noticeStyle = @($notices | Where-Object { $_ -match '^C2|^C4' }).Count
+Write-Output ("提示分档: 结构 {0}｜配比 {1}｜数字 {2}｜对比与风格 {3}（合计 {4}，均不影响 PASS）" -f $noticeStruct, $noticeRatio, $noticeData, $noticeStyle, $notices.Count)
 $notices | ForEach-Object { Write-Output ('  · ' + $_) }
 
 # 机器可读摘要行（纯 ASCII，便于 CI 与其它工具按字段取值，不受控制台代码页影响）

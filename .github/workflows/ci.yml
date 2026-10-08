@@ -139,7 +139,12 @@ jobs:
           $plnParas = [regex]::Matches($pln, '<p>').Count
           if ($labParas -ne $plnParas) { throw "labeled and plain paragraph counts differ: $labParas vs $plnParas" }
 
-          Write-Host "box separation ok: labeled boxes=$labBoxes paragraphs=$labParas; plain paragraphs=$plnParas"
+          $labRoles = [regex]::Matches($lab, "<div class='role'>").Count
+          $plnRoles = [regex]::Matches($pln, "<div class='role'>").Count
+          if ($labRoles -ne 5) { throw "the annotated .doc must label every body paragraph (expected 5 role lines), got $labRoles" }
+          if ($plnRoles -ne 0) { throw "the -Plain .doc must carry no role lines, got $plnRoles" }
+
+          Write-Host "annotation ok: labeled boxes=$labBoxes roles=$labRoles paragraphs=$labParas; plain paragraphs=$plnParas roles=$plnRoles"
 
       - name: Default output naming must not double the dot
         shell: pwsh
@@ -260,3 +265,26 @@ jobs:
           if ($summary -notmatch 'marker=false') { throw "expected SUMMARY marker=false, got: $summary" }
 
           Write-Host 'negative test (missing BODY divider) passed'
+
+      - name: Negative test - the gate must require a cost sentence in the closing paragraph
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $src = Join-Path $root 'tests/fixtures/sample-essay.md'
+          $bad = Join-Path $env:TEMP 'gate-negative-cost.md'
+
+          # \u4EE3\u4EF7 is the cost word; replace it with a neutral word so the closing loses its cost/boundary sentence.
+          $costWord = ([string]([char]0x4EE3)) + ([string]([char]0x4EF7))
+          $neutralWord = ([string]([char]0x6536)) + ([string]([char]0x76CA))
+          $text = Get-Content -LiteralPath $src -Raw -Encoding UTF8
+          Set-Content -LiteralPath $bad -Value ($text.Replace($costWord, $neutralWord)) -Encoding UTF8
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $bad -RequireTerms 'TCC'
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 1) { throw "expected the gate to exit 1 without a cost sentence, got $code" }
+          $summary = $output | Where-Object { $_ -like 'SUMMARY *' } | Select-Object -First 1
+          if ($summary -notmatch 'problems=1') { throw "expected exactly one problem (missing cost sentence), got: $summary" }
+
+          Write-Host 'negative test (missing cost sentence) passed'

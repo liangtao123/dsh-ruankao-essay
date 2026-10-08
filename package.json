@@ -2,7 +2,7 @@
   "name": "dsh-ruankao-essay",
   "version": "0.1.0",
   "private": true,
-  "description": "软考系统分析师论文助手：题库查询 + 10 段式写作与 Word 交付（two skills: ruankao-essay-writing, ruankao-essay-bank）",
+  "description": "软考系统分析师／系统架构设计师论文助手（2026-10 机考口径）：题库查询 + 摘要≤300／正文 2000~2500 双框写作与 Word 交付（three skills: ruankao-essay-writing, ruankao-essay-review, ruankao-essay-bank）",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -28,8 +28,8 @@
     }
   },
   "meta": {
-    "title": "软考系分论文助手",
-    "description": "题库索引 + 10 段式论文写作、改写与 Word 交付"
+    "title": "软考系分／架构论文助手",
+    "description": "题库索引（系分＋架构 2016—2026）+ 摘要≤300／正文 2000~2500 双框论文写作、自评与 Word 交付"
   },
   "icon": "./icon.svg",
   "files": [

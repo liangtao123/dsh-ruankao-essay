@@ -1,14 +1,15 @@
 ﻿# 成稿入库：把一篇已完成的论文成稿收进本地题库，并同步成稿索引
 # 用法示例：
-#   & .\ingest-essay.ps1 -MdPath 'D:\...\论xxx.md' -Source '2024/05 试题一' `
-#       -Background '某省电网调度自动化系统（1600 万／12 个月）' `
-#       -SubQuestions '①项目与工作；②六阶段；③项目如何设计' `
-#       -Landing '段1 ①；段4 六阶段；段5~7 三段实例；段9 成效与不足' `
-#       -Reusable '六阶段名称、两条回路、量化数据（3 人天→半天）'
+#   & .\ingest-essay.ps1 -MdPath 'D:\...\论xxx.md' -Source '2023/05 试题三' `
+#       -Background '某市轨道交通票务清分系统（1800 万／12 个月）' `
+#       -SubQuestions '①项目与工作；②三种角色的职责；③项目如何落地' `
+#       -Landing '摘要 ①；段2 背景；段3 回应②；段4~5 两段论；段6 成效与理解' `
+#       -Reusable '三角色/三工件/五活动名称、分片重算方案、量化数据（6 小时→90 分钟）'
 #
-# 行为：①先跑门禁 check-essay.ps1，未 PASS 拒绝入库；②统计段数/含标点/纯汉字；
+# 行为：①先跑门禁 check-essay.ps1，未 PASS 拒绝入库；②按机考口径统计摘要字数/正文字数/正文纯汉字；
 #       ③题库一览表：同题名则更新该行，否则追加；④逐题记录：不存在则按模板追加；
 #       ⑤若给了 -IndexPath，同步成稿索引表；⑥打印本次改动摘要。
+# 契约：源稿第 1 段＝摘要（≤300 含标点），其余段落＝正文（2000~2500 含标点）。
 
 [CmdletBinding()]
 param(
@@ -39,14 +40,18 @@ $gateCode = $LASTEXITCODE
 $gateOut | ForEach-Object { Write-Output ('  ' + $_) }
 if ($gateCode -ne 0) { Write-Output '[拒绝入库] 成稿未通过门禁，请先按上面的失败项修改。'; exit 1 }
 
-# ② 统计
+# ② 统计（机考双框口径：第 1 段＝摘要，其余＝正文）
 $rawLines = Get-Content $MdPath -Encoding UTF8
-$lines = $rawLines | Where-Object { $_.Trim() -ne '' -and $_ -notmatch '^<!--' }
-$body = ($lines -join '')
-$chars = ($body -replace '\s', '').Length
-$hanzi = ($body.ToCharArray() | Where-Object { [int]$_ -ge 0x4E00 -and [int]$_ -le 0x9FA5 }).Count
+$lines = @($rawLines | Where-Object { $_.Trim() -ne '' -and $_ -notmatch '^<!--' })
 $title = [System.IO.Path]::GetFileNameWithoutExtension($MdPath)
 $paras = $lines.Count
+$abstractText = ''
+$bodyText = ''
+if ($paras -ge 1) { $abstractText = [string]$lines[0] }
+if ($paras -ge 2) { $bodyText = (@($lines[1..($paras - 1)]) -join '') }
+$abstractChars = ($abstractText -replace '\s', '').Length
+$bodyChars = ($bodyText -replace '\s', '').Length
+$hanzi = ($bodyText.ToCharArray() | Where-Object { [int]$_ -ge 0x4E00 -and [int]$_ -le 0x9FA5 }).Count
 
 $bank = [System.IO.File]::ReadAllText($BankPath, [System.Text.Encoding]::UTF8)
 $rowPattern = '(?m)^\| (\d+) \| ' + [regex]::Escape($title) + ' \|.*$'
@@ -55,13 +60,13 @@ $changed = @()
 if ($bank -match $rowPattern) {
   $existing = [regex]::Match($bank, $rowPattern).Value
   $num = [regex]::Match($existing, '^\| (\d+) \|').Groups[1].Value
-  $newRow = "| $num | $title | $Source | $paras／$chars | $Background | ``$title`` |"
+  $newRow = "| $num | $title | $Source | $abstractChars／$bodyChars | $Background | ``$title`` |"
   $bank = [regex]::Replace($bank, $rowPattern, { param($m) $newRow }, 1)
-  $changed += "题库一览表已更新第 $num 行（段数／字数刷新）"
+  $changed += "题库一览表已更新第 $num 行（摘要／正文字数刷新）"
 } else {
   $nums = [regex]::Matches($bank, '(?m)^\| (\d+) \| 论') | ForEach-Object { [int]$_.Groups[1].Value }
   $num = if ($nums.Count -gt 0) { ($nums | Measure-Object -Maximum).Maximum + 1 } else { 1 }
-  $newRow = "| $num | $title | $Source | $paras／$chars | $Background | ``$title`` |"
+  $newRow = "| $num | $title | $Source | $abstractChars／$bodyChars | $Background | ``$title`` |"
   $lastRow = [regex]::Matches($bank, '(?m)^\| \d+ \| 论.*$')
   if ($lastRow.Count -eq 0) { Write-Output '[错误] 题库里找不到一览表数据行，无法定位插入点'; exit 3 }
   $anchor = $lastRow[$lastRow.Count - 1].Value
@@ -95,7 +100,7 @@ $sectionHeader
 # ⑤ 索引同步
 if ($IndexPath -and (Test-Path $IndexPath)) {
   $idx = [System.IO.File]::ReadAllText($IndexPath, [System.Text.Encoding]::UTF8)
-  $idxRow = "| $num | $title | **$Source** | $paras | $chars | $hanzi | $Background |"
+  $idxRow = "| $num | $title | **$Source** | $abstractChars | $bodyChars | $hanzi | $Background |"
   $pat = '(?m)^\| \d+ \| ' + [regex]::Escape($title) + ' \|.*$'
   if ($idx -match $pat) {
     $idx = [regex]::Replace($idx, $pat, { param($m) $idxRow }, 1)
@@ -114,6 +119,6 @@ if ($IndexPath -and (Test-Path $IndexPath)) {
 
 Write-Output '---- 入库结果 ----'
 Write-Output ("  题目：$title")
-Write-Output ("  出处：$Source    段数=$paras    含标点=$chars    纯汉字=$hanzi")
+Write-Output ("  出处：$Source    段数=$paras    摘要字数=$abstractChars    正文字数=$bodyChars    正文纯汉字=$hanzi")
 $changed | ForEach-Object { Write-Output ('  · ' + $_) }
 Write-Output '  完成。'

@@ -1,5 +1,7 @@
 ﻿# 把软考论文的 Markdown 源稿转成 Word 可直接打开的 .doc（HTML 型），
-# 并输出段数与含标点字数用于自检。
+# 并按 2026-10 机考口径分别输出摘要字数与正文字数用于自检。
+#
+# 契约：源稿第 1 段＝摘要（≤300 字，含标点），其余段落＝正文（2000~2500 字，含标点）。
 #
 # 用法：
 #   pwsh -File make-essay-doc.ps1 -MdPath "D:\path\论题目.md"
@@ -58,10 +60,18 @@ foreach ($line in $lines) {
 }
 [void]$sb.AppendLine('</body></html>')
 
-# 段数与含标点字数（自检用）
-$body = ($lines -join '')
-$chars = ($body -replace '\s', '').Length
-$hanzi = ($body.ToCharArray() | Where-Object { [int]$_ -ge 0x4E00 -and [int]$_ -le 0x9FA5 }).Count
+# 双框字数（自检用）：契约是第 1 段＝摘要，其余段落＝正文
+function Get-HanziCount([string]$text) {
+  return ($text.ToCharArray() | Where-Object { [int]$_ -ge 0x4E00 -and [int]$_ -le 0x9FA5 }).Count
+}
+$paras = @($lines)
+$abstractText = ''
+$bodyText = ''
+if ($paras.Count -ge 1) { $abstractText = [string]$paras[0] }
+if ($paras.Count -ge 2) { $bodyText = (@($paras[1..($paras.Count - 1)]) -join '') }
+$abstractChars = ($abstractText -replace '\s', '').Length
+$bodyChars = ($bodyText -replace '\s', '').Length
+$bodyHanzi = Get-HanziCount $bodyText
 
 $target = $OutPath
 try {
@@ -80,5 +90,6 @@ try {
   }
 }
 
-Write-Output ("段落数: {0}  含标点字数: {1}  纯汉字: {2}" -f $lines.Count, $chars, $hanzi)
+Write-Output ("段数: {0}  摘要字数: {1}  正文字数: {2}  正文纯汉字: {3}" -f $paras.Count, $abstractChars, $bodyChars, $bodyHanzi)
+Write-Output ("机考口径: 摘要 ≤300 字 / 正文 2000~2500 字（均含标点）")
 Write-Output ("已生成: {0}" -f $target)

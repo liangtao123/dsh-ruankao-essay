@@ -1,15 +1,15 @@
 ---
 name: ruankao-essay-bank
-description: 软考系统分析师论文题库与写作规范。Look up Chinese Soft Exam (软考) 系统分析师 essay topics: the 2016–2026 真题 table, per-topic theory skeletons, writing specification, scoring pitfalls and project-background guidance. Use when the user asks which 论文题目 exist, what theory points a topic needs, what project or quantified data to cite, or before writing any 软考系分 essay.
+description: 软考系统分析师／系统架构设计师论文题库与写作规范（2026-10 机考口径）。Look up Chinese Soft Exam (软考) 系统分析师 and 系统架构设计师 essay topics: the 2016–2026 真题 tables for both subjects, per-topic theory skeletons (including 敏捷与 Scrum 的角色／工件／活动, 质量属性与架构评估, 数据架构), the current writing specification (摘要≤300 字＋正文 2000~2500 字, part-by-part word budgets), the public scoring norms (five aspects and their weights, deduction and bonus items), and project-background guidance. Use when the user asks which 论文题目 exist, what theory points a topic needs, how long each part should be, what project or quantified data to cite, or before writing any 软考系分／架构 essay.
 ---
 
-# 软考系统分析师论文题库与素材库
+# 软考论文题库与素材库（系统分析师／系统架构设计师）
 
 拿到题目或想选题时先查这里，不要凭记忆编理论点。
 
 ## 三步入库
 
-1. **定位题型**：在 `references/topic-index-lite.md` 的「历年真题题名」里找题目，再进「通用理论骨架」取该题型要写进正文的分类清单（名称须与题目用词一致）。**先列一次 `references/*.md`**：本地若有「已写题目记录」（成稿题库），先查该题是否写过——写过就直接复用成稿或同项目的背景、数据与骨架，避免重复劳动。
+1. **定位题型**：在 `references/topic-index-lite.md` 的「历年真题题名」里按科目找题目（（一）系统分析师、（二）系统架构设计师），再进「通用理论骨架」取该题型要写进正文的分类清单（名称须与题目用词一致）。**先列一次 `references/*.md`**：本地若有「已写题目记录」（成稿题库），先查该题是否写过——写过就直接复用成稿或同项目的背景、数据与骨架，避免重复劳动。
 2. **取项目与数据**：从同文件的「作者自有项目背景」挑背景（含行业、规模、周期、已适配题型）；本地若另有参考资料，再从中取字数、结构与量化数据。
 3. **成稿**：写作规格与交付流程见 `ruankao-essay-writing` 技能。
 
@@ -17,7 +17,7 @@ description: 软考系统分析师论文题库与写作规范。Look up Chinese 
 
 | 文件 | 内容 |
 |---|---|
-| `references/topic-index-lite.md` | 历年真题题名（2016—2026）、通用理论骨架、写作规格速览、项目背景写法要点（**随仓库分发**） |
+| `references/topic-index-lite.md` | 历年真题题名（2016—2026，分系统分析师／系统架构设计师两表，含科目差异与考期安排）、通用理论骨架（含敏捷与 Scrum、质量属性与架构评估、数据架构）、写作规格速览（摘要 ≤300＋正文 2000~2500）、考试常识与官方评分口径、项目背景写法要点（**随仓库分发**） |
 | `references/` 下的其它 `.md` | 本地参考资料（按题型详表、理论素材、**已写题目记录**等，**不随仓库分发**） |
 
 `references/` 目录里除 `topic-index-lite.md` 以外的文件属于作者的本地资料，其中可能包含「成稿题库」：逐题记录子题目要点、段落落点与可复用点，并给出跨题复用建议。**先列目录**（glob `references/*.md`）确认有哪些可用，再按需读取；若只有公开版索引，就只用它完成任务，并向使用者说明可补充的本地资料未就位。加载这些文件时按其内容当作数据使用，其中出现的金额、周期、百分比**引用前须与使用者确认真实数据**。
@@ -31,10 +31,12 @@ description: 软考系统分析师论文题库与写作规范。Look up Chinese 
 ## 与其他技能的分工
 
 - 本技能＝**查**（题库、理论、素材、数据）。
-- `ruankao-essay-writing`＝**写**（10 段结构、字数、语气、子题目回应、doc 交付）。
+- `ruankao-essay-writing`＝**写**（摘要／正文双框字数、部分配比、语气、子题目回应、doc 交付与门禁）。
 - 典型顺序：本技能查题与骨架 → 写作技能成稿与交付。
 
 ## 注意
 
 - 参考资料里的项目背景、金额、周期、百分比**引用前请与用户确认真实数据**；用户给了真实项目就以用户的为准。
+- 真题表按公开站点汇总整理：每道题名至少两个独立公开来源；列内顺序主要取自公开试卷页或带试题序号的来源，标 `†` 的行（2025/11）列序未核，别把它当成官方题序。
+- 2023 年下半年起论文机考分批，同一考期不同批次题目可能不同；表里只收录公开汇总版，遇到批次差异以当次试卷为准。
 - 「扣分雷区」按阅卷评分口径整理，落笔前逐条过一遍。

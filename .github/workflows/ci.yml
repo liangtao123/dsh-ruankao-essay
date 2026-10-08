@@ -21,8 +21,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 语法检查 index.js
-        run: node --check index.js
+      - name: 语法检查 index.js 与 client.js
+        run: |
+          node --check index.js
+          node --check client.js
 
       - name: 解析 JSON 清单
         run: |
@@ -42,23 +44,29 @@ jobs:
           echo "only public reference files are tracked"
 
   word-script:
-    name: 生成脚本端到端测试（Windows PowerShell 5.1）
+    name: 生成脚本与论文门禁端到端测试（Windows PowerShell 5.1）
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
       # 注意：GitHub 把 run 脚本写成无 BOM 的临时 .ps1，Windows PowerShell 5.1 会按 ANSI 误读其中的中文。
-      # 因此本作业的驱动脚本一律只用 ASCII 报错信息，并显式用 powershell.exe（5.1）执行被测脚本。
-      - name: Check that the script keeps its UTF-8 BOM
+      # 因此本作业的驱动脚本只用 ASCII 信息与码点构造的字符，并显式用 powershell.exe（5.1）执行被测脚本。
+      - name: Check that both PowerShell scripts keep their UTF-8 BOM
         shell: pwsh
         run: |
-          $script = Join-Path $PWD 'assets/ruankao-essay-writing/scripts/make-essay-doc.ps1'
-          $bytes = [System.IO.File]::ReadAllBytes($script)
-          $hasBom = $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
-          if (-not $hasBom) { throw 'make-essay-doc.ps1 must be saved as UTF-8 with BOM' }
-          Write-Host "BOM ok ($($bytes.Length) bytes)"
+          $scripts = @(
+            'assets/ruankao-essay-writing/scripts/make-essay-doc.ps1',
+            'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          )
+          foreach ($rel in $scripts) {
+            $script = Join-Path $PWD $rel
+            $bytes = [System.IO.File]::ReadAllBytes($script)
+            $hasBom = $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+            if (-not $hasBom) { throw "$rel must be saved as UTF-8 with BOM" }
+            Write-Host "BOM ok: $rel ($($bytes.Length) bytes)"
+          }
 
-      - name: Generate a .doc with Windows PowerShell 5.1 and assert the output
+      - name: Generate a .doc and assert the paragraph count matches the fixture
         shell: pwsh
         run: |
           $root = $PWD.Path
@@ -67,6 +75,9 @@ jobs:
           $out = Join-Path $root 'tests/out/sample.doc'
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'tests/out') | Out-Null
 
+          $expected = (Get-Content -LiteralPath $fixture -Encoding UTF8 |
+            Where-Object { $_.Trim() -ne '' -and $_.Trim() -notmatch '^<!--' }).Count
+
           $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath $fixture -OutPath $out
           $output | ForEach-Object { Write-Host $_ }
 
@@ -74,14 +85,108 @@ jobs:
 
           $doc = Get-Content -LiteralPath $out -Raw
           $paragraphs = [regex]::Matches($doc, '<p>').Count
-          if ($paragraphs -ne 10) { throw "expected 10 paragraphs, got $paragraphs" }
+          if ($paragraphs -ne $expected) { throw "expected $expected paragraphs, got $paragraphs" }
 
-          # Only the body matters: straight quotes inside HTML attributes are expected.
+          # The fixture itself must be free of straight quotes; conversion is covered by the next step.
+          $body = [regex]::Match($doc, '(?s)<body>(.*)</body>').Groups[1].Value
+          $straight = [regex]::Matches($body, '"').Count
+          if ($straight -ne 0) { throw "sample fixture body contains $straight straight quotes" }
+
+          Write-Host "paragraphs = $paragraphs, straight quotes in body = $straight"
+
+      - name: Assert straight quotes get converted to Chinese quotes
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $script = Join-Path $root 'assets/ruankao-essay-writing/scripts/make-essay-doc.ps1'
+          $fixture = Join-Path $root 'tests/fixtures/quote-sample.md'
+          $out = Join-Path $root 'tests/out/quote.doc'
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -MdPath $fixture -OutPath $out
+          $output | ForEach-Object { Write-Host $_ }
+
+          $doc = Get-Content -LiteralPath $out -Raw
           $body = [regex]::Match($doc, '(?s)<body>(.*)</body>').Groups[1].Value
           $straight = [regex]::Matches($body, '"').Count
           $chinese = [regex]::Matches($body, "[\u201C\u201D]").Count
           Write-Host "body: straight quotes = $straight, chinese quotes = $chinese"
           if ($straight -ne 0) { throw 'body still contains straight quotes' }
-          if ($chinese -eq 0) { throw 'straight quotes in the fixture were not converted' }
+          if ($chinese -lt 2) { throw 'straight quotes in the fixture were not converted' }
 
-          Write-Host 'end-to-end test passed'
+      - name: Run the essay gate on the fixture and assert PASS plus the word caps
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $fixture = Join-Path $root 'tests/fixtures/sample-essay.md'
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $fixture -RequireTerms 'TCC'
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) { throw "gate exited with $code on the fixture" }
+
+          $summary = $output | Where-Object { $_ -like 'SUMMARY *' } | Select-Object -First 1
+          if (-not $summary) { throw 'gate did not print a SUMMARY line' }
+
+          $fields = @{}
+          foreach ($m in [regex]::Matches($summary, '(\w+)=(\S+)')) { $fields[$m.Groups[1].Value] = $m.Groups[2].Value }
+          if ($fields['pass'] -ne 'true') { throw 'gate SUMMARY reports pass != true' }
+          if ([int]$fields['abstract'] -gt 300) { throw "abstract over the 300-character cap: $($fields['abstract'])" }
+          if ([int]$fields['body'] -lt 2000 -or [int]$fields['body'] -gt 2500) { throw "body out of 2000~2500: $($fields['body'])" }
+
+          Write-Host "gate ok: abstract=$($fields['abstract']) body=$($fields['body']) paragraphs=$($fields['paragraphs'])"
+
+      - name: Negative test - the gate must reject an over-long abstract
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $bad = Join-Path $env:TEMP 'gate-negative.md'
+
+          $longAbstract = ([string]([char]0x7CFB)) * 320
+          $body = ([string]([char]0x6B63)) * 2050
+          Set-Content -LiteralPath $bad -Value @($longAbstract, $body) -Encoding UTF8
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $bad
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 1) { throw "expected the gate to exit 1 for an over-long abstract, got $code" }
+
+          Write-Host 'negative test passed'
+
+      - name: Negative test - the gate must reject a body below 2000 characters
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $bad = Join-Path $env:TEMP 'gate-negative-short.md'
+
+          $abstract = ([string]([char]0x7CFB)) * 280
+          $body = ([string]([char]0x6B63)) * 1500
+          Set-Content -LiteralPath $bad -Value @($abstract, $body) -Encoding UTF8
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $bad
+          $code = $LASTEXITCODE
+          if ($code -ne 1) { throw "expected the gate to exit 1 for a short body, got $code" }
+
+          Write-Host 'negative test passed'
+
+      - name: Negative test - the gate must reject straight quotes and enumerated starters
+        shell: pwsh
+        run: |
+          $root = $PWD.Path
+          $gate = Join-Path $root 'assets/ruankao-essay-writing/scripts/check-essay.ps1'
+          $bad = Join-Path $env:TEMP 'gate-negative-style.md'
+
+          $quote = [char]0x22
+          $abstract = ([string]([char]0x7CFB)) * 280
+          $starter = ([string]([char]0x9996)) + ([string]([char]0x5148))
+          $body = (([string]([char]0x6B63)) * 2050) + $quote + $starter
+          Set-Content -LiteralPath $bad -Value @($abstract, $body) -Encoding UTF8
+
+          $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $gate -MdPath $bad
+          $code = $LASTEXITCODE
+          $output | ForEach-Object { Write-Host $_ }
+          if ($code -ne 1) { throw "expected the gate to exit 1 for a straight quote, got $code" }
+
+          Write-Host 'negative test passed'

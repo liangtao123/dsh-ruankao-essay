@@ -7,6 +7,7 @@
  *  2. cordis.patch.yml 声明的插件 id 与包名正确
  *  3. index.js 登记的每个技能都有 assets/<name>/SKILL.md，且 frontmatter 的 name 与目录名一致、description 非空
  *  4. 写作技能引用的生成脚本存在，且为带 BOM 的 UTF-8
+ *  4c. Client 面板的架构题名与公开题库表一致、覆盖 2016—2026 各年度、骨架 tag 与 zh／en 字典键集正确
  *  5. 私有题库文件未被纳入版本控制（git 可用时）
  *
  * 用法：node scripts/verify-manifest.mjs
@@ -75,18 +76,27 @@ for (const name of skillNames) {
   ok(`skill: ${name}（frontmatter 正确，description ${description.length} 字符）`);
 }
 
-// 4) 生成脚本存在且带 BOM
-const scriptPath = "assets/ruankao-essay-writing/scripts/make-essay-doc.ps1";
-if (!existsSync(join(root, scriptPath))) {
-  fail(`生成脚本缺失：${scriptPath}`);
-} else {
+// 4) 脚本存在且带 BOM（Windows PowerShell 5.1 会按 ANSI 误读无 BOM .ps1 里的中文）
+const scriptPaths = [
+  "assets/ruankao-essay-writing/scripts/make-essay-doc.ps1",
+  "assets/ruankao-essay-writing/scripts/check-essay.ps1",
+  "assets/ruankao-essay-writing/scripts/ingest-essay.ps1",
+];
+for (const scriptPath of scriptPaths) {
+  if (!existsSync(join(root, scriptPath))) {
+    fail(`脚本缺失：${scriptPath}`);
+    continue;
+  }
   const bytes = readFileSync(join(root, scriptPath));
   const hasBom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
   if (!hasBom) fail(`${scriptPath} 必须保存为带 BOM 的 UTF-8（Windows PowerShell 5.1 会按 ANSI 误读中文）`);
   else ok(`script: ${scriptPath}（${bytes.length} 字节，BOM 正确）`);
-  if (!read("assets/ruankao-essay-writing/SKILL.md").includes("make-essay-doc.ps1")) {
-    fail("写作技能未引用生成脚本");
-  }
+}
+if (!read("assets/ruankao-essay-writing/SKILL.md").includes("make-essay-doc.ps1")) {
+  fail("写作技能未引用生成脚本");
+}
+if (!read("assets/ruankao-essay-writing/SKILL.md").includes("check-essay.ps1")) {
+  fail("写作技能未引用门禁脚本");
 }
 
 // 4b) Client 半（可选）：清单声明与产物必须一致
@@ -110,6 +120,90 @@ if (clientManifest !== undefined) {
     else ok(`client: 注册到槽位 ${slotMatch[1]}，模块 id 与包名一致`);
   }
   if ((pkg.files ?? []).includes(clientPath) === false) fail(`package.json 的 files 未包含 ${clientPath}，发布 npm 时会漏掉`);
+}
+
+// 4c) 面板数据与公开题库必须同源（防止一边改了题名另一边没跟上）
+try {
+  const bankPath = "assets/ruankao-essay-bank/references/topic-index-lite.md";
+  const bank = read(bankPath);
+  const client = read("client.js");
+
+  const heading = bank.indexOf("### （二）系统架构设计师");
+  if (heading < 0) fail(`${bankPath} 缺少「（二）系统架构设计师」小节`);
+  const archBlock = heading < 0 ? "" : bank.slice(heading).split("\n## ")[0];
+  const clean = (text) => text.replace(/[`*\s]/g, "");
+  const bankRows = new Map();
+  for (const line of archBlock.split("\n")) {
+    const cells = line.split("|").map((cell) => cell.trim());
+    const yearMatch = cells.length >= 7 ? cells[1].match(/^(20\d\d\/\d\d)/) : null;
+    if (yearMatch === null) continue;
+    bankRows.set(yearMatch[1], cells.slice(2, 6).map(clean).filter((title) => title !== "" && title !== "—"));
+  }
+  if (bankRows.size === 0) fail(`${bankPath} 的架构题名表未解析到任何考期行`);
+
+  const archStart = client.indexOf("id: 'arch'");
+  if (archStart < 0) fail("client.js 未找到 arch 科目数据");
+  const archSlice = archStart < 0 ? "" : client.slice(archStart, client.indexOf("];", archStart));
+  const panelRows = new Map();
+  for (const match of archSlice.matchAll(/year:\s*'(\d{4}\/\d{2})',\s*titles:\s*\[([^\]]*)\]/g)) {
+    panelRows.set(match[1], [...match[2].matchAll(/'([^']*)'/g)].map((item) => clean(item[1])));
+  }
+
+  const onlyBank = [...bankRows.keys()].filter((year) => !panelRows.has(year));
+  const onlyPanel = [...panelRows.keys()].filter((year) => !bankRows.has(year));
+  if (onlyBank.length > 0) fail(`面板缺少考期：${onlyBank.join(", ")}`);
+  if (onlyPanel.length > 0) fail(`题库表缺少考期：${onlyPanel.join(", ")}`);
+  const mismatched = [];
+  for (const [year, titles] of bankRows) {
+    const other = panelRows.get(year) ?? [];
+    const missing = titles.filter((title) => !other.includes(title));
+    const extra = other.filter((title) => !titles.includes(title));
+    if (missing.length > 0 || extra.length > 0) {
+      mismatched.push(`${year}（题库独有：${missing.join("、") || "无"}；面板独有：${extra.join("、") || "无"}）`);
+    }
+  }
+  if (mismatched.length > 0) fail(`架构题名面板与题库表不一致：${mismatched.join("；")}`);
+  else if (bankRows.size > 0) {
+    ok(`架构题名面板与题库表一致（${bankRows.size} 个考期，${[...bankRows.values()].reduce((total, list) => total + list.length, 0)} 道题）`);
+  }
+
+  // 考期覆盖：2016—2026 每年至少一次，2024／2025 各两次，共 13 个考期
+  const years = [...bankRows.keys()].map((year) => year.slice(0, 4));
+  const missingYears = [];
+  for (let year = 2016; year <= 2026; year += 1) if (!years.includes(String(year))) missingYears.push(String(year));
+  const notDoubled = ["2024", "2025"].filter((year) => years.filter((item) => item === year).length !== 2);
+  if (missingYears.length > 0) fail(`架构表未覆盖这些年度：${missingYears.join(", ")}`);
+  if (notDoubled.length > 0) fail(`架构表这些年度应各有两个考期：${notDoubled.join(", ")}`);
+  if (bankRows.size !== 13) fail(`架构表应有 13 个考期，实际 ${bankRows.size} 个`);
+
+  // 题型骨架必须带合法 tag，且字典有对应文案
+  const skeletons = [...client.matchAll(/\{\s*name:\s*'([^']+)'\s*,\s*tag:\s*'([^']+)'/g)].map((match) => ({ name: match[1], tag: match[2] }));
+  if (skeletons.length === 0) fail("client.js 未解析到任何题型骨架");
+  const badTag = skeletons.filter((skeleton) => !["general", "sas", "arch"].includes(skeleton.tag));
+  if (badTag.length > 0) fail(`题型骨架的 tag 非法：${badTag.map((item) => `${item.name}=${item.tag}`).join(", ")}`);
+  const declaredTags = [...new Set(skeletons.map((skeleton) => skeleton.tag))];
+  for (const value of ["all", ...declaredTags]) {
+    if (!client.includes(`'tag.${value}':`)) fail(`client.js 缺少字典键 tag.${value}`);
+  }
+
+  // zh／en 字典键集必须一致
+  const keySet = (locale) => {
+    const start = client.indexOf(`\n      ${locale}: {`);
+    const block = start < 0 ? "" : client.slice(start, client.indexOf("\n      },", start));
+    return [...block.matchAll(/'([a-z][a-zA-Z.]*)':/g)].map((match) => match[1]).sort();
+  };
+  const zhKeys = keySet("zh");
+  const enKeys = keySet("en");
+  if (zhKeys.length === 0 || enKeys.length === 0) fail("client.js 的 zh／en 字典未解析到键");
+  else if (zhKeys.join(",") !== enKeys.join(",")) {
+    const missingEn = zhKeys.filter((key) => !enKeys.includes(key));
+    const missingZh = enKeys.filter((key) => !zhKeys.includes(key));
+    fail(`client.js 的 zh／en 字典键集不一致（en 缺：${missingEn.join(", ") || "无"}；zh 缺：${missingZh.join(", ") || "无"}）`);
+  } else {
+    ok(`client 字典 zh／en 键集一致（${zhKeys.length} 键），${skeletons.length} 类题型骨架均有合法 tag`);
+  }
+} catch (error) {
+  fail(`面板与题库一致性检查失败：${error.message}`);
 }
 
 // 5) 技能引用的公开索引必须存在

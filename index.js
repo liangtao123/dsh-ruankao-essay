@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 /**
- * 软考系统分析师论文助手 —— 技能提供者插件。
+ * 软考系统分析师／系统架构设计师论文助手 —— 技能提供者插件。
  *
  * 把一个 workspace 目录里的 SKILL.md 目录树注册成三个技能：
  * - ruankao-essay-writing：写作与改写总纲
@@ -31,19 +31,19 @@ const SKILLS = [
     dir: "ruankao-essay-writing",
     name: "ruankao-essay-writing",
     description:
-      "软考系统分析师论文写作与改写总纲。Write or rewrite a Chinese Soft Exam (软考) 系统分析师 essay from a 论文题目 (with its 三个子题目) or from the user's draft: forces a strict 10-paragraph structure, exact word-count band, no titles/no sub-headings/no first person, explicit sub-question coverage, at least one real project instance per argument, and delivery as a Word .doc plus .md. Use whenever the task is 软考系分论文, 论文改写, 论文押题, or 考场论文成稿.",
+      "软考系统分析师／系统架构设计师论文写作与改写总纲（2026-10 机考口径）。Write or rewrite a Chinese Soft Exam (软考) 系统分析师 or 系统架构设计师 essay from a 论文题目 (with its 三个子题目) or from the user's draft against the current computer-based-exam spec: a standalone 摘要 of ≤300 characters plus a 正文 of 2000~2500 characters, part-by-part word budgets (项目背景 / 技术方法说明 / 论点两段 / 结尾), explicit sub-question coverage, at least one real project instance per argument, a quantified closing that reflects on the method instead of listing weaknesses, and delivery as a Word .doc plus .md. Use whenever the task is 软考系分／架构论文, 论文改写, 论文押题, or 考场论文成稿.",
   },
   {
     dir: "ruankao-essay-review",
     name: "ruankao-essay-review",
     description:
-      "软考系统分析师论文自评与批改。Review a finished Chinese Soft Exam (软考) 系统分析师 essay against the public scoring norms and return a per-paragraph verdict: sub-question coverage, 10-paragraph structure, word-count band, forbidden patterns (titles, first person, enumerated starters), theory accuracy, project-instance grounding, quantified results, and a closing weakness-and-improvement pair; then propose concrete rewrites. Use when the user submits a draft or finished essay and asks to 自评, 批改, 打分, 查漏, or 提分, or asks whether an essay is ready to submit.",
+      "软考系统分析师／系统架构设计师论文自评与批改（2026-10 机考口径）。Review a finished Chinese Soft Exam (软考) 系统分析师 or 系统架构设计师 essay against the current computer-based-exam spec and the public scoring norms, then return a part-by-part verdict: 摘要≤300 / 正文 2000~2500 双框字数, part-by-part word budgets (项目背景 / 技术方法说明 / 论点两段 / 结尾), sub-question coverage, forbidden patterns (titles, 「背景／子题目」字眼, enumerated starters), theory-name coverage, project-instance grounding, quantified results, a closing that reflects on the method instead of listing weaknesses, and the official five scoring aspects; then propose concrete rewrites. Use when the user submits a draft or finished essay and asks to 自评, 批改, 打分, 查漏, or 提分, or asks whether an essay is ready to submit.",
   },
   {
     dir: "ruankao-essay-bank",
     name: "ruankao-essay-bank",
     description:
-      "软考系统分析师论文题库与写作规范。Look up Chinese Soft Exam (软考) 系统分析师 essay topics and reusable material: the 2016–2026 真题 table, per-topic theory skeletons, writing specification and scoring pitfalls, plus the project-background guidance needed before writing. Use when the user asks which 论文题目 exist, what theory points a topic needs, what project or quantified data to cite, or before writing any 软考系分 essay.",
+      "软考系统分析师／系统架构设计师论文题库与写作规范（2026-10 机考口径）。Look up Chinese Soft Exam (软考) 系统分析师 and 系统架构设计师 essay topics: the 2016–2026 真题 tables for both subjects, per-topic theory skeletons (including 敏捷与 Scrum 的角色／工件／活动, 质量属性与架构评估, 数据架构), the current writing specification (摘要≤300 字＋正文 2000~2500 字, part-by-part word budgets), the public scoring norms (five aspects and their weights, deduction and bonus items), and project-background guidance. Use when the user asks which 论文题目 exist, what theory points a topic needs, how long each part should be, what project or quantified data to cite, or before writing any 软考系分／架构 essay.",
   },
 ];
 

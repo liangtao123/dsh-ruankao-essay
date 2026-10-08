@@ -1,14 +1,16 @@
 ﻿# 插件健康巡检：清单校验 + 隐私边界 + 题库一致性 + CI 状态
 # 用法：& .\scripts\health-check.ps1 [-SkipCi] [-EssaysDir <路径>]
+#   -EssaysDir 默认是仓库内的 essays 目录（成稿为个人材料，已由 .git/info/exclude 排除）
 # 退出码：0 全部通过；1 有需要处理的问题
 
 [CmdletBinding()]
 param(
   [switch]$SkipCi,
-  [string]$EssaysDir = 'D:\project\deeepseek\extract\parts'
+  [string]$EssaysDir
 )
 
 $root = Split-Path -Parent $PSScriptRoot
+if (-not $EssaysDir) { $EssaysDir = Join-Path $root 'essays' }
 $bank = Join-Path $root 'assets\ruankao-essay-bank\references\finished-essays.md'
 $problems = @()
 $notes = @()
@@ -24,20 +26,25 @@ if (-not $node) { $node = 'C:\Users\18814\.dsh\dsh-runtimes\dsh-primary-runtime\
 $verify = & $node (Join-Path $root 'scripts\verify-manifest.mjs') 2>&1
 $verifyCode = $LASTEXITCODE
 $verify | Select-Object -Last 2 | ForEach-Object { Write-Output ('  ' + $_) }
-if ($verifyCode -ne 0) { $problems += '清单校验未通过' } else { $notes += '清单校验 12 项通过' }
+if ($verifyCode -ne 0) {
+  $problems += '清单校验未通过'
+} else {
+  $count = [regex]::Match(($verify -join "`n"), '清单校验通过：(\d+) 项').Groups[1].Value
+  if ($count) { $notes += ('清单校验 ' + $count + ' 项通过') } else { $notes += '清单校验通过' }
+}
 
 # 2) 隐私边界：本地资料不得入库
 Write-Output ''
 Write-Output '--- 2/4 隐私边界（本地资料是否泄漏进版本库）---'
 Push-Location $root
 $tracked = git ls-files
-$private = @('courseware-3-4.md','exam-points.md','essay-bank.md','type-index.md','finished-essays.md','quick-cards.md')
+$private = @('courseware-3-4.md','exam-points.md','essay-bank.md','type-index.md','finished-essays.md','quick-cards.md','baodian-v6.0.0.md','baodian-v6.0.0-fanwen.md','arch-topic-sources.md')
 $leaked = @()
 foreach ($f in $private) {
   $hit = $tracked | Where-Object { $_ -like ('*' + $f) }
   if ($hit) { $leaked += ($f + ' -> ' + ($hit -join ',')) }
 }
-if ($leaked.Count -gt 0) { $problems += ('本地资料被跟踪：' + ($leaked -join '; ')) } else { $notes += ('6 份本地资料均未被跟踪') }
+if ($leaked.Count -gt 0) { $problems += ('本地资料被跟踪：' + ($leaked -join '; ')) } else { $notes += ($private.Count.ToString() + ' 份本地资料均未被跟踪') }
 
 $dirty = git status --porcelain
 if ($dirty) { $notes += ('工作区有未提交改动 ' + (@($dirty).Count) + ' 项（发布前请提交）') } else { $notes += '工作区干净' }
@@ -50,7 +57,7 @@ Pop-Location
 Write-Output ''
 Write-Output '--- 3/4 题库一致性（成稿 vs 一览表）---'
 if (-not (Test-Path $bank)) {
-  $problems += ('找不到题库：' + $bank)
+  $notes += ('本地题库尚未生成（' + $bank + '）：跑一次 ingest-essay.ps1 即可创建；它属于个人资料，不随仓库分发')
 } else {
   $rows = @(Select-String -Path $bank -Pattern '^\| \d+ \| 论' -Encoding UTF8).Count
   $essays = @()

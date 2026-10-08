@@ -1,32 +1,33 @@
-# 软考系分论文助手 · DSH 插件
+# 软考系分／架构论文助手 · DSH 插件
 
 [![CI](https://github.com/Zm886/dsh-ruankao-essay/actions/workflows/ci.yml/badge.svg)](https://github.com/Zm886/dsh-ruankao-essay/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-4D6BFE.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-7A5CFF.svg)](CHANGELOG.md)
 [![DSH](https://img.shields.io/badge/DSH-Host%20bundle-000000.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
-把「软考系统分析师论文」的题库、写作规范与交付流程打包成 DSH 插件，装上以后在任意会话里都能直接调用；另附一个 Web UI 里的题库速查面板。
+把「软考系统分析师／系统架构设计师论文」的题库、写作规范与交付流程打包成 DSH 插件，装上以后在任意会话里都能直接调用；另附一个 Web UI 里的题库速查面板。
 
 - **插件名（包名）**：`dsh-ruankao-essay`
 - **Host 插件行 id**：`ruankao-essay`
-- **提供的技能**：`ruankao-essay-writing`（写作／改写总纲）、`ruankao-essay-bank`（题库与写作规范）、`ruankao-essay-review`（逐段自评与改写建议）
+- **提供的技能**：`ruankao-essay-writing`（写作／改写总纲）、`ruankao-essay-bank`（题库、理论骨架与评分口径）、`ruankao-essay-review`（逐部分自评与改写建议）
+- **写作口径**：2026-10 机考双框——摘要 ≤300 字（含标点）＋正文 2000~2500 字（含标点）
 - **Client 半**：`client.js`，在 `conversation.composer.dock` 注册「题库速查」面板
 - **形态**：Host 半纯 JS 无依赖、无构建步骤；Client 半是单文件浏览器模块
 - **版本**：0.1.0，变更见 [CHANGELOG.md](CHANGELOG.md)　·　安全策略见 [SECURITY.md](SECURITY.md)　·　贡献指南见 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## 一、它解决什么问题
 
-写软考系分论文的痛点不是「不会写」，而是每次都要重新回忆：这篇题目的子题目有哪几块、该配哪个项目、理论点怎么写全、字数与结构怎么卡、成稿怎么变成 Word、交稿前怎么自查。本插件把这些固化成三个技能：
+写软考系分／架构论文的痛点不是「不会写」，而是每次都要重新回忆：这篇题目的子题目有哪几块、该配哪个项目、理论点怎么写全、字数与结构怎么卡、成稿怎么变成 Word、交稿前怎么自查。本插件把这些固化成三个技能：
 
 | 技能 | 干什么 | 何时加载 |
 |---|---|---|
-| `ruankao-essay-bank` | 查：真题表（2016—2026）、按题型的理论骨架、写作规格与扣分雷区 | 拿到题目先查它 |
-| `ruankao-essay-writing` | 写：10 段式结构、字数口径、语气禁忌、子题目回应规则、Word 交付脚本 | 动笔与交付时 |
-| `ruankao-essay-review` | 评：机械项检查（段数／字数／禁写项）＋逐段体检＋逐条改写建议 | 交稿前自评 |
+| `ruankao-essay-bank` | 查：真题表（2016—2026，系统分析师＋系统架构设计师两表）、按题型的理论骨架、写作规格、考试常识与官方评分口径 | 拿到题目先查它 |
+| `ruankao-essay-writing` | 写：摘要／正文双框字数、部分配比、子题目回应规则、Word 交付与门禁脚本 | 动笔与交付时 |
+| `ruankao-essay-review` | 评：机械项检查（双框字数／禁写项／结尾模板化）＋逐部分体检＋逐条改写建议 | 交稿前自评 |
 
-两者配合的完整链路：**查题 → 定骨架 → 配实例 → 成稿 → 自检 → 生成 .doc**。
+三个技能配合的完整链路：**查题 → 备材料（PRD）→ 定骨架 → 配实例 → 成稿 → 门禁自检 → 生成 .doc**。
 
-此外，插件在 DSH Web UI 的对话输入区上方提供一个**题库速查面板**：点开后可切换「历年真题 / 题型骨架 / 写作规格」三个页签，用于在写之前快速定位题目与要点（内容与仓库内的公开版索引一致）。
+此外，插件在 DSH Web UI 的对话输入区上方提供一个**题库速查面板**：点开后可切换「历年真题 / 题型骨架 / 写作规格」三个页签，历年真题页签里能切换系统分析师／系统架构设计师两个科目并按住次筛选，题型骨架页签支持按「通用／系分／架构」筛选（内容与仓库内的公开版索引一致）。
 
 ## 二、安装
 
@@ -77,7 +78,7 @@ Copy-Item "D:\project\deeepseek\dsh-plugins\dsh-ruankao-essay\assets\*" "$env:US
 dsh-ruankao-essay/
 ├─ package.json          # dsh.bundle.patch、meta、icon、files、repository
 ├─ cordis.patch.yml      # 向 profile 插入 id: ruankao-essay 的 Host 插件行
-├─ index.js              # Cordis 插件：ctx.skills.registerProvider(...) 注册两个技能
+├─ index.js              # Cordis 插件：ctx.skills.registerProvider(...) 注册三个技能
 ├─ client.js             # Client 半：在 Web UI 注册题库速查面板
 ├─ icon.svg              # 插件卡片图标
 ├─ locale/{zh,en}.json   # 插件卡片标题与描述
@@ -85,43 +86,52 @@ dsh-ruankao-essay/
 ├─ SECURITY.md           # 安全策略与漏洞报告方式
 ├─ CONTRIBUTING.md       # 贡献指南与内容边界
 ├─ scripts/
-│  └─ verify-manifest.mjs        # 清单／技能资产／脚本 BOM／Client 半 校验
+│  ├─ verify-manifest.mjs         # 清单／技能资产／脚本 BOM／Client 半／面板与题库一致性 校验
+│  └─ health-check.ps1            # 本地巡检：清单 + 隐私边界 + 题库一致性 + CI（可选）
 ├─ .github/workflows/
 │  ├─ ci.yml                     # CI：Linux 校验 + Windows 端到端测试
 │  └─ github-release.yml         # 打 tag 时只创建 GitHub Release（不发 npm）
 ├─ tests/
-│  ├─ fixtures/sample-essay.md   # 公开的 10 段测试样例
+│  ├─ fixtures/sample-essay.md   # 公开的合规样例（摘要＋正文 6 段，须过门禁）
+│  ├─ fixtures/quote-sample.md   # 直引号 → 中文引号 的转换样例
 │  └─ out/                       # 测试产物（已 gitignore）
 └─ assets/
    ├─ ruankao-essay-writing/          # 技能一：写
    │  ├─ SKILL.md
    │  ├─ references/writing-rules.md
-   │  └─ scripts/make-essay-doc.ps1   # Markdown → Word 可打开的 .doc（含段数与字数自检）
+   │  └─ scripts/
+   │     ├─ make-essay-doc.ps1        # Markdown → Word 可打开的 .doc（分别统计摘要／正文字数）
+   │     ├─ check-essay.ps1           # 门禁：双框字数＋格式＋部分职能＋实例密度＋术语覆盖
+   │     └─ ingest-essay.ps1          # 过门禁后把成稿收进本地题库（个人资料，不入库）
    ├─ ruankao-essay-review/           # 技能三：评
-   │  └─ SKILL.md                     # 逐段体检表＋五类扣分＋输出格式
+   │  └─ SKILL.md                     # 逐部分体检表＋五类扣分＋输出格式
    └─ ruankao-essay-bank/             # 技能二：查
       ├─ SKILL.md
-      └─ references/topic-index-lite.md
+      └─ references/topic-index-lite.md   # 系分＋架构真题题名、理论骨架、写作规格、评分口径
 ```
 
-脚本放在写作技能目录内，因此无论是「插件资源基」还是「技能目录」安装，`<skill-directory>/scripts/make-essay-doc.ps1` 都能正确定位。
+脚本放在写作技能目录内，因此无论是「插件资源基」还是「技能目录」安装，`<skill-directory>/scripts/make-essay-doc.ps1` 与 `check-essay.ps1` 都能正确定位。
 
 ## 四、用起来是什么样
 
 会话里出现「写软考系分论文 / 这个论文题目怎么写 / 押题」之类需求时，Agent 会加载技能，然后：
 
-1. 在 `references/topic-index-lite.md` 里定位题目（真题题名、通用理论骨架、写作规格、可选项目）；若本地 `references/` 下另有参考资料，优先按需读取；
-2. 按 10 段式规格成稿：**严格 10 段、含标点 2500~2800、无标题、无分点标号、无第一人称、周期只写首段**；
-3. 每个论点配一条项目业务实例，效果给量化数据，收尾写 2~3 条不足与改进；
-4. 用脚本产出 Word（用调用运算符，不要套 `pwsh -File`——本机 shell 里没有 `pwsh` 命令）：
+1. 在 `references/topic-index-lite.md` 里定位题目（真题题名、通用理论骨架、写作规格、考试常识与评分口径）；若本地 `references/` 下另有参考资料，优先按需读取；
+2. 按机考双框口径成稿：**摘要 ≤300 字独立成部分（不写「摘要」二字）、正文 2000~2500 字（均含标点）、无标题、无「背景／子题目」字眼、无分点标号、建设期只写在摘要**；
+3. 部分配比：项目背景 400~500／技术方法说明 400~500（回应子题目 2）／论点两段各约 500（回应子题目 3）／结尾 300~450；每个论点配一条项目业务实例，正文至少 3 段带具体数字；
+4. 结尾写量化成效与对该方法的理性认识，**不写**「不足之处／改进措施／下一步将」这套模板；
+5. 用脚本交付并过门禁（用调用运算符，不要套 `pwsh -File`——本机 shell 里没有 `pwsh` 命令）：
 
 ```powershell
-& "<skill-directory>\scripts\make-essay-doc.ps1" -MdPath "D:\out\论微服务架构及其应用.md"
-# 段落数: 10  含标点字数: 2534  纯汉字: 2116
-# 已生成: D:\out\论微服务架构及其应用.doc
+& "<skill-directory>\scripts\make-essay-doc.ps1" -MdPath "D:\out\论敏捷开发方法（Scrum）.md"
+# 段数: 6  摘要字数: 296  正文字数: 2384  正文纯汉字: 2120
+# 已生成: D:\out\论敏捷开发方法（Scrum）.doc
+
+& "<skill-directory>\scripts\check-essay.ps1" -MdPath "D:\out\论敏捷开发方法（Scrum）.md" -RequireTerms '角色','工件','活动'
+# 结论: PASS —— 摘要与正文均在机考字数内，格式与部分职能满足口径
 ```
 
-脚本会剥掉 `**` 粗体标记并统计真实字数，段数应为 10、含标点字数落在 2500~2800。
+门禁未输出 `PASS` 不得交付；脚本会剥掉 `**` 粗体标记再统计，并按「第 1 段＝摘要」分别核对 300 与 2000~2500 两个字数十限（可用 `-AbstractMax`／`-BodyMin`／`-BodyMax` 调整）。
 
 ## 五、自制／扩展
 
@@ -140,13 +150,16 @@ node scripts/verify-manifest.mjs
 # 校验清单字段、加载器补丁、技能资产与 frontmatter、脚本 BOM、Client 半
 ```
 
-它检查 9 项：`package.json` 的 `dsh.bundle.patch`／`manifestVersion`／`meta`／`icon`／`main` 与依赖声明、`cordis.patch.yml` 的 id 与包名、每个技能都有对应 `assets/<name>/SKILL.md` 且 frontmatter 的 `name` 与目录一致、生成脚本存在且带 UTF-8 BOM、`dsh.client` 声明与 `client.js` 的模块 id／槽位一致、必备文件齐全、`references/` 下只有公开文件被跟踪、以及**发布白名单只包含仓库已跟踪的文件**（防止把本机资料打包出去）。
+它检查 15 项：`package.json` 的 `dsh.bundle.patch`／`manifestVersion`／`meta`／`icon`／`main` 与依赖声明、`cordis.patch.yml` 的 id 与包名、每个技能都有对应 `assets/<name>/SKILL.md` 且 frontmatter 的 `name` 与目录一致、三个 PowerShell 脚本存在且带 UTF-8 BOM、`dsh.client` 声明与 `client.js` 的模块 id／槽位一致、**面板的架构题名与题库表逐条一致且覆盖 2016—2026 各年度（架构 13 个考期）**、**每类题型骨架都带合法 tag 且 zh／en 字典键集一致**、必备文件齐全、`references/` 下只有公开文件被跟踪、以及**发布白名单只包含仓库已跟踪的文件**（防止把本机资料打包出去）。
 
-### 端到端测试生成脚本
+### 端到端测试脚本与门禁
 
 ```powershell
 & .\assets\ruankao-essay-writing\scripts\make-essay-doc.ps1 -MdPath .\tests\fixtures\sample-essay.md -OutPath .\tests\out\sample.doc
-# 段落数: 10  含标点字数: 1012  纯汉字: 870
+# 段数: 6  摘要字数: 271  正文字数: 2056  正文纯汉字: 1885
+
+& .\assets\ruankao-essay-writing\scripts\check-essay.ps1 -MdPath .\tests\fixtures\sample-essay.md -RequireTerms 'TCC'
+# 结论: PASS
 ```
 
 ### CI（GitHub Actions）
@@ -155,17 +168,19 @@ node scripts/verify-manifest.mjs
 
 | 作业 | 运行环境 | 内容 |
 |---|---|---|
-| 清单与技能资产校验 | ubuntu-latest | `node --check index.js`、解析 JSON、跑 `verify-manifest.mjs`、确认 `references/` 下只有公开文件被跟踪 |
-| 生成脚本端到端测试 | windows-latest | 校验脚本保留 UTF-8 BOM，用 `tests/fixtures/sample-essay.md` 生成 `.doc`，断言段数为 10、正文无直引号且有中文引号 |
+| 清单与技能资产校验 | ubuntu-latest | `node --check index.js`／`client.js`、解析 JSON、跑 `verify-manifest.mjs`（含面板与题库表一致性、年度覆盖、骨架 tag、zh／en 字典键集）、确认 `references/` 下只有公开文件被跟踪 |
+| 生成脚本与门禁端到端测试 | windows-latest | 校验两个脚本保留 UTF-8 BOM；由 fixture 推导期望段数并断言 `.doc` 段数一致；用 `quote-sample.md` 断言直引号被转成中文引号；跑门禁断言 `pass=true` 且摘要 ≤300、正文 2000~2500；另有三条负例（摘要超长／正文过短／直引号与分点标号）断言门禁返回 1 |
 
 另有 `.github/workflows/github-release.yml`：推送 `v*` tag 时先跑校验，再创建一个 GitHub Release（仅源码快照，不发布到 npm）。
 
 ### 已知限制
 
-- 技能是否生效：装好后新开会话，用 `skill` 工具按名字加载 `ruankao-essay-bank`，能返回目录即成功；或在设置页插件清单里看到「软考系分论文助手」。
-- 插件只提供写作规范、公开考题信息与理论骨架；**项目与数据请使用你自己的真实项目**。
-- 本插件只提供技能与脚本，不含 UI 面板；若想要侧边栏可视化题库，需要再加 Client 插件（可用 `templates/decoration` 起步）。
-- `make-essay-doc.ps1` 在 Windows PowerShell 5.1 与 PowerShell 7 上均可用；脚本必须保持带 BOM 的 UTF-8，CI 会拦截丢失 BOM 的提交。
+- 技能是否生效：装好后新开会话，用 `skill` 工具按名字加载 `ruankao-essay-bank`，能返回目录即成功；或在设置页插件清单里看到「软考系分／架构论文助手」。
+- 插件只提供写作规范、公开考题信息（含官方评分口径）与理论骨架；**项目与数据请使用你自己的真实项目**。
+- 本插件不含第三方课程的范文、句式原文或统计数据：受版权保护的资料不入库，句式与写法一律用自撰表述承载。
+- 真题题名按公开站点汇总整理（核实日期 2026-10-08）：每道题名至少两个独立来源，列序多取自公开试卷页或带试题序号的来源；2025/11 标 `†`（列序未核），2023/11 起机考分批、同一考期不同批次题目可能不同。`verify-manifest.mjs` 会校验面板数据与题库表一致、架构表覆盖 2016—2026 各年度。
+- `make-essay-doc.ps1` 与 `check-essay.ps1` 在 Windows PowerShell 5.1 与 PowerShell 7 上均可用；脚本必须保持带 BOM 的 UTF-8，CI 与 `verify-manifest.mjs` 都会拦截丢失 BOM 的提交。
+- 门禁的硬项是摘要 ≤300 与正文 2000~2500（含标点）；部分配比只做提示。若官方口径变化，改脚本参数即可，不必改逻辑。
 
 ## 七、从 GitHub 安装
 

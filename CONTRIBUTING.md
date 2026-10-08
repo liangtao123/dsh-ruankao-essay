@@ -5,13 +5,13 @@
 ## 一、先决条件
 
 - Node.js ≥ 20（只用于校验脚本与 CI，本插件没有构建步骤）
-- Windows 上另需 PowerShell 5.1 或 PowerShell 7（用于端到端测试生成脚本）
+- Windows 上另需 PowerShell 5.1 或 PowerShell 7（用于端到端测试生成脚本与门禁）
 - 可选：DSH 桌面端，用于实际安装验证
 
 ## 二、仓库结构
 
 ```
-index.js                 Host 半：向 ctx.skills 注册两个技能
+index.js                 Host 半：向 ctx.skills 注册三个技能
 client.js                Client 半（可选）：在 Web UI 里注册一个面板
 cordis.patch.yml         向 profile 插入插件行的加载器补丁
 assets/<skill-name>/     技能目录：SKILL.md + references/ + scripts/
@@ -30,20 +30,29 @@ tests/fixtures/          端到端测试样例
 ```powershell
 # 1) 语法与清单
 node --check index.js
+node --check client.js
 node scripts/verify-manifest.mjs
 
-# 2) 生成脚本端到端（用真 Windows PowerShell 5.1）
-$s = "$PWD\assets\ruankao-essay-writing\scripts\make-essay-doc.ps1"
+# 2) 生成 .doc 与门禁端到端（用真 Windows PowerShell 5.1）
+$root = $PWD
+$s = "$root\assets\ruankao-essay-writing\scripts\make-essay-doc.ps1"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $s `
-  -MdPath "$PWD\tests\fixtures\sample-essay.md" -OutPath "$PWD\tests\out\sample.doc"
-# 期望输出：段落数: 10
+  -MdPath "$root\tests\fixtures\sample-essay.md" -OutPath "$root\tests\out\sample.doc"
+# 期望输出：段数: 6  摘要字数: 271  正文字数: 2056
+
+$g = "$root\assets\ruankao-essay-writing\scripts\check-essay.ps1"
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $g `
+  -MdPath "$root\tests\fixtures\sample-essay.md" -RequireTerms 'TCC'
+# 期望输出：结论: PASS（并有一行 SUMMARY ... pass=true）
 ```
 
 `verify-manifest.mjs` 会检查：清单字段、补丁 id 与包名、每个技能的 frontmatter 与目录名一致、
-生成脚本存在且为**带 BOM 的 UTF-8**、Client 半的模块 id 与槽位、必备文件齐全、
-`references/` 下只有公开文件被跟踪、`files` 白名单只包含仓库已跟踪的文件。
+三个 PowerShell 脚本存在且为**带 BOM 的 UTF-8**、Client 半的模块 id 与槽位、
+**面板的架构题名与题库表逐条一致且覆盖 2016—2026 各年度**、**每类题型骨架都带合法 tag 且 zh／en 字典键集一致**、
+必备文件齐全、`references/` 下只有公开文件被跟踪、`files` 白名单只包含仓库已跟踪的文件。
 
-CI（`.github/workflows/ci.yml`）在 push 与 PR 时跑同样的检查，Windows 作业会真的生成一次 `.doc`。
+CI（`.github/workflows/ci.yml`）在 push 与 PR 时跑同样的检查，Windows 作业会真的生成一次 `.doc`、
+跑一次门禁并验证三条负例（摘要超长／正文过短／直引号与分点标号必须被拒绝）。
 
 ## 四、修改约定
 
@@ -51,11 +60,13 @@ CI（`.github/workflows/ci.yml`）在 push 与 PR 时跑同样的检查，Window
 
 本仓库是**公开仓库**，请只提交：
 
-- 插件代码、技能骨架、写作规范、公开的考试题目信息、教科书层面的通用理论。
+- 插件代码、技能骨架、写作规范（含机考字数口径）、公开的考试题目信息与官方评分口径、教科书层面的通用理论。
+- **真题题名可以入库**（考期、试题序号、题名属公开考试信息，例如 `topic-index-lite.md` 的两张题名表），但必须来自公开站点并可追溯，且单源题名要带 `*` 标记。
 
 **请勿提交**（并请注意本地忽略配置不会保护你）：
 
-- 第三方的课程、教材或他人作品；
+- 第三方的课程、教材或他人作品；**付费课程／论文宝典的原文、范文、句式模板与统计数据一律不得入库**（写法与句式请用自己的话重写）；
+- 真题的**解析、参考答案要点、范文与通过率统计**（题名之外的衍生内容一律不入库）以及带来源 URL 的取证台账；
 - 自己的备考笔记、个人整理稿与项目数据；
 - 令牌、密钥、内网地址、个人身份信息。
 
@@ -82,10 +93,12 @@ docs: 说明公开内容边界
 
 ## 五、Pull Request 检查表
 
-- [ ] `node --check index.js` 通过
-- [ ] `node scripts/verify-manifest.mjs` 通过（9 项）
-- [ ] 生成脚本端到端测试输出「段落数: 10」
-- [ ] 没有提交任何第三方资料、个人资料或密钥
+- [ ] `node --check index.js` 与 `node --check client.js` 通过
+- [ ] `node scripts/verify-manifest.mjs` 通过（15 项）
+- [ ] 生成脚本端到端输出「段数: 6  摘要字数: ≤300  正文字数: 2000~2500」
+- [ ] 门禁脚本对 `tests/fixtures/sample-essay.md` 输出 `结论: PASS`
+- [ ] 没有提交任何第三方资料（含付费课程与论文宝典的原文、范文、句式）、个人资料或密钥
+- [ ] 新增／订正题名来自公开站点（可追溯），单源题名带 `*`，且已同步 `client.js` 面板数据（`verify-manifest.mjs` 会拦不一致）
 - [ ] 新增/修改的技能已同步 `README.md` 的说明与 `CHANGELOG.md`
 - [ ] 行为变更已写进 `CHANGELOG.md` 的 `Unreleased`
 
